@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#102b27">
+  <meta name="description" content="A Telugu Panchangam timing chart for your date and location.">
+  <title>Daily Panchangam</title>
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <header class="topbar"><a class="brand" href="./" aria-label="Daily Panchangam home"><span class="brand-mark">పం</span><span>DAILY PANCHANGAM</span></a><button id="installButton" class="install-button" hidden>Install app</button></header>
+  <main>
+    <section class="intro">
+      <p class="eyebrow">A day planned around your sunrise</p>
+      <h1>Find your <span>clear window.</span></h1>
+      <p class="lede">Choose a date and place to see hora, ghadiya, and traditional periods to avoid, together on one timeline.</p>
+    </section>
+    <section class="controls card" aria-label="Date and location">
+      <label class="field"><span>Date</span><input id="dateInput" type="date"></label>
+      <div class="field location-field"><label for="placeInput">Location</label><div class="location-row"><input id="placeInput" type="search" placeholder="Search a city or place" autocomplete="off"><button id="searchButton" class="secondary-button">Search</button></div><div id="searchResults" class="search-results" hidden></div></div>
+      <button id="gpsButton" class="gps-button"><span aria-hidden="true">⌖</span> Use my location</button>
+      <p id="status" class="status" role="status" aria-live="polite">Search for a place or use your location to begin.</p>
+    </section>
+    <section id="dailySummary" class="summary-grid" hidden aria-label="Sunrise and sunset"></section>
+    <section id="periodSection" class="section" hidden>
+      <div class="section-heading"><div><p class="eyebrow">Avoid starting important new work</p><h2>Periods to watch</h2></div><span class="section-count" id="periodCount"></span></div>
+      <div id="periodList" class="period-grid"></div>
+    </section>
+    <section id="horaSection" class="section" hidden>
+      <div class="section-heading"><div><p class="eyebrow">12 daytime + 12 nighttime horas</p><h2>Hora · planetary hours</h2></div><span class="section-note">Each hora follows the local day or night length</span></div>
+      <div id="horaList" class="hora-grid"></div>
+    </section>
+    <section id="ghadiyaSection" class="section" hidden>
+      <div class="section-heading"><div><p class="eyebrow">30 source-table intervals · 24 minutes each</p><h2>Ghadiya · 24-minute results</h2></div><span id="weekdayLabel" class="section-note"></span></div>
+      <p class="section-copy">The selected weekday's Telugu result is shown for each interval after local sunrise. Bad periods and hora are called out when they overlap a slot.</p>
+      <div id="ghadiyaList" class="ghadiya-list"></div>
+    </section>
+    <aside class="note-card"><span class="note-icon">i</span><p><strong>Tradition and accuracy.</strong> Rahu Kalam, Yamagandam and Gulika are calculated by dividing daylight into eight parts. Durmuhurtham uses a weekday-based one-of-15 daylight segment. Panchangam conventions can differ by region; use this chart as a planning aid, not a substitute for your family's or priest's tradition. The ghadiya ratings are inferred from the Telugu result text; review neutral/uncertain labels with care.</p></aside>
+    <footer><span>Shubhakruth Samvatsara ghadiya table supplied by you.</span><span>Sunrise/sunset data: Open-Meteo · Place search: OpenStreetMap</span></footer>
+  </main>
+  <script src="./app.js" defer></script>
+</body>
+</html>
