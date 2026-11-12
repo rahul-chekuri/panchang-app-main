@@ -27,7 +27,7 @@ function app(overrides = {}) {
 
 function firstCard(horas, periods = []) {
   const instance = app();
-  instance.renderGhadiya(0, 360, horas.map(([start, end, index]) => {
+  instance.renderGhadiya(0, 360, 1080, 360, horas.map(([start, end, index]) => {
     const planet = instance.PLANETS[index];
     return { start, end, planet, tone: planet.tone };
   }), periods);
@@ -39,7 +39,7 @@ test('every supplied weekday result has Telugu text and retains its Romanized so
   assert.equal(instance.GHADIYA_ROWS.length, 30);
   assert.equal(instance.GHADIYA_TELUGU_ROWS.length, 30);
   for (let day = 0; day < 7; day++) {
-    instance.renderGhadiya(day, 360, [], []);
+    instance.renderGhadiya(day, 360, 1080, 360, [], []);
     const html = instance.elements.get('ghadiyaList').innerHTML;
     for (let row = 0; row < 30; row++) {
       assert.equal(instance.GHADIYA_TELUGU_ROWS[row].length, 7);
@@ -170,14 +170,15 @@ test('manual sunrise and sunset bypass the network even with a saved location', 
     const solar = await instance.resolveSunTimes('2026-11-12', place, '06:00', '17:40');
     assert.equal(solar.sunrise, 360);
     assert.equal(solar.sunset, 1060);
-    assert.equal(solar.nextSunrise, null);
+    assert.equal(solar.nextSunrise, 360);
+    assert.equal(solar.estimatedNextSunrise, true);
   }
   await assert.rejects(instance.resolveSunTimes('2026-11-12', null, '06:00', ''), /both sunrise and sunset/);
   await assert.rejects(instance.resolveSunTimes('2026-11-12', null, '18:00', '18:00'), /before sunset/);
   await assert.rejects(instance.resolveSunTimes('2026-11-12', null, '25:00', '18:00'), /valid/);
 });
 
-test('manual chart renders without a location and leaves after-sunset horas unknown', async () => {
+test('manual chart renders day and night without a location', async () => {
   const instance = app({ fetch() { throw new Error('Network must not be used'); } });
   instance.elements.get('status').classList = { toggle() {} };
   instance.elements.get('sunriseInput').value = '06:00';
@@ -185,15 +186,50 @@ test('manual chart renders without a location and leaves after-sunset horas unkn
   await instance.loadChart();
   assert.equal(instance.elements.get('dailySummary').hidden, false);
   assert.match(instance.elements.get('dailySummary').innerHTML, /6:00 AM/);
-  assert.match(instance.elements.get('status').textContent, /No location or internet needed/);
-  assert.equal((instance.elements.get('horaList').innerHTML.match(/<article/g) || []).length, 12);
-  assert.equal((instance.elements.get('ghadiyaList').innerHTML.match(/<article/g) || []).length, 30);
-  const horas = instance.makeHoras(4, 360, 1060, null);
-  assert.equal(horas[11].end, 1060);
-  const segments = instance.splitGhadiya(1056, 1080, 'good', horas, []);
-  assert.equal(segments.length, 2);
-  assert.equal(segments[1].start, 1060);
-  assert.equal(segments[1].tone, 'average');
-  assert.match(segments[1].label, /Hora unavailable/);
-  assert.equal(instance.makeHoras(4, 360, 1060, 361).length, 24);
+  assert.match(instance.elements.get('status').textContent, /estimated as 6:00 AM/);
+  assert.equal((instance.elements.get('horaList').innerHTML.match(/<article/g) || []).length, 25);
+  assert.equal((instance.elements.get('ghadiyaList').innerHTML.match(/<article/g) || []).length, 61);
+  assert.match(instance.elements.get('horaHelp').textContent, /estimated/);
+});
+
+test('hora cycles use chart weekdays and one-hour boundaries, truncating at sunset and next sunrise', () => {
+  const { makeHoras } = app();
+  const horas = makeHoras(0, 370, 1062, 370, 'waxing');
+  assert.deepEqual(Array.from(horas.slice(0, 3), h => [h.start, h.end, h.planet.en]), [
+    [370, 430, 'Sun'], [430, 490, 'Venus'], [490, 550, 'Mercury']
+  ]);
+  assert.deepEqual(Array.from(horas.slice(11, 13), h => [h.start, h.end, h.planet.en, h.cycle]), [
+    [1030, 1062, 'Saturn', 'Day'], [1062, 1122, 'Jupiter', 'Night']
+  ]);
+  assert.equal(horas.at(-1).end, 1810);
+  assert.equal(horas.at(-1).end - horas.at(-1).start, 28);
+  for (let day = 0; day < 7; day++) {
+    const h = makeHoras(day, 360, 1080, 360, 'waxing');
+    assert.equal(h[12].planet.en, ['Jupiter','Venus','Saturn','Sun','Moon','Mars','Mercury'][day]);
+  }
+});
+
+test('Moon hora is green when waxing, red when waning, and amber if unspecified', () => {
+  const { makeHoras, splitGhadiya } = app();
+  for (const [phase, tone] of [['waxing','good'], ['waning','bad'], ['', 'average']]) {
+    const moon = makeHoras(1, 360, 1080, 360, phase)[0];
+    assert.equal(moon.planet.en, 'Moon');
+    assert.equal(moon.tone, tone);
+    const segment = splitGhadiya(360, 384, 'good', [moon], [])[0];
+    assert.equal(segment.tone, tone);
+    if (!phase) assert.match(segment.label, /Select Moon phase/);
+  }
+});
+
+test('ghadiya cycles restart at sunset, repeat after 30 rows, and stop at next sunrise', () => {
+  const instance = app();
+  instance.renderGhadiya(0, 360, 1100, 370, [], []);
+  const html = instance.elements.get('ghadiyaList').innerHTML;
+  const cards = html.split('<article class="ghadiya-card">').slice(1);
+  assert.ok(cards[0].includes('Day · 6:00 AM–6:24 AM'));
+  assert.ok(cards[30].includes('Day · 6:00 PM–6:20 PM'));
+  assert.ok(cards[30].includes(instance.GHADIYA_ROWS[0][0]));
+  assert.ok(cards[31].includes('Night · 6:20 PM–6:44 PM'));
+  assert.ok(cards[31].includes(instance.GHADIYA_ROWS[0][0]));
+  assert.ok(cards.at(-1).includes('6:10 AM (+1 day)'));
 });

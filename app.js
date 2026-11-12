@@ -111,13 +111,16 @@ function makePeriods(dayIndex,sunrise,dayLength) {
   const n=DURMUHURTA[dayIndex]; slots.push({name:'Durmuhurtham',start:sunrise+(n-1)*muhurta,end:sunrise+n*muhurta,detail:`Daylight muhurta ${n} of 15`});
   return slots;
 }
-function makeHoras(dayIndex,sunrise,sunset,nextSunrise) {
-  const dayLen=sunset-sunrise, nightLen=(nextSunrise+1440-sunset)%1440;
-  return Array.from({length:nextSunrise==null?12:24},(_,i)=>{
-    const daytime=i<12, segment=daytime?i:i-12, len=daytime?dayLen/12:nightLen/12, start=daytime?sunrise+segment*len:sunset+segment*len;
-    const p=PLANETS[(WEEKDAY_START[dayIndex]+i)%7];
-    return {start,end:start+len,planet:p,tone:p.tone};
-  });
+function makeHoras(dayIndex,sunrise,sunset,nextSunrise,moonPhase) {
+  const horas=[];
+  for(const [start,end,offset,cycle] of [[sunrise,sunset,0,'Day'],[sunset,nextSunrise+1440,12,'Night']]){
+    for(let i=0;start+i*60<end;i++){
+      const p=PLANETS[(WEEKDAY_START[dayIndex]+offset+i)%7];
+      const tone=p.en==='Moon'?(moonPhase==='waxing'?'good':moonPhase==='waning'?'bad':'average'):p.tone;
+      horas.push({start:start+i*60,end:Math.min(start+(i+1)*60,end),planet:p,tone,cycle});
+    }
+  }
+  return horas;
 }
 function intersecting(items,start,end) { return items.filter(x=>intersects(start,end,x.start,x.end)); }
 function manualSunrise(value) {
@@ -136,7 +139,7 @@ async function resolveSunTimes(date,selectedPlace,sunriseValue,sunsetValue) {
   const sunrise=manualSunrise(sunriseValue), sunset=manualSunrise(sunsetValue);
   if(sunrise!==null&&sunset!==null){
     if(sunrise>=sunset) throw new Error('Entered sunrise must be before sunset.');
-    return {sunrise,sunset,nextSunrise:null,timezone:'Your entered local times',manual:true};
+    return {sunrise,sunset,nextSunrise:sunrise,timezone:'Your entered local times',manual:true,estimatedNextSunrise:true};
   }
   if(!selectedPlace) throw new Error('Enter both sunrise and sunset, or select a location to calculate missing times.');
   const solar=applySunrise(await getSunTimes(date,selectedPlace.lat,selectedPlace.lon),sunriseValue);
@@ -161,21 +164,27 @@ function renderHoras(horas,periods) {
     const hit=intersecting(periods,h.start,h.end);
     const tags=hit.length?`<div class="tags">${hit.map(p=>`<span class="tag">${p.name}</span>`).join('')}</div>`:'';
     const tone=hit.length?'bad':h.tone;
-    const rating=hit.length?`Avoid where overlapping · ${hit.map(p=>p.name).join(', ')}`:h.tone==='good'?'Favorable':h.tone==='bad'?'Avoid for new starts':'Mixed';
-    return `<article class="hora-card ${tone}"><div class="hora-time">Hora / <span lang="te">హోర</span> ${String(i+1).padStart(2,'0')} · ${fmt(h.start)}–${fmt(h.end)}</div><div class="hora-planet"><strong lang="te">${h.planet.name}</strong><span>${h.planet.en}</span></div><div class="rating">${rating}</div>${tags}</article>`;
+    const rating=hit.length?`Avoid where overlapping · ${hit.map(p=>p.name).join(', ')}`:h.planet.en==='Moon'&&h.tone==='average'?'Select Moon phase':h.tone==='good'?'Favorable':h.tone==='bad'?'Avoid for new starts':'Mixed';
+    return `<article class="hora-card ${tone}"><div class="hora-time">${h.cycle} · Hora / <span lang="te">హోర</span> ${String(i+1).padStart(2,'0')} · ${chartTime(h.start)}–${chartTime(h.end)}</div><div class="hora-planet"><strong lang="te">${h.planet.name}</strong><span>${h.planet.en}</span></div><div class="rating">${rating}</div>${tags}</article>`;
   }).join(''); $('horaSection').hidden=false;
 }
-function renderGhadiya(dayIndex,sunrise,horas,periods) {
-  $('weekdayLabel').textContent=`${DAYS[dayIndex]} · Shubhakruth source table`;
-  $('ghadiyaList').innerHTML=GHADIYA_ROWS.map((row,i)=>{
-    const start=sunrise+i*24,end=start+24,text=row[dayIndex],tone=classify(text);
+function renderGhadiya(dayIndex,sunrise,sunset,nextSunrise,horas,periods) {
+  $('weekdayLabel').textContent=`${DAYS[dayIndex]} · same weekday table repeated at sunset`;
+  const slots=[];
+  for(const [cycleStart,cycleEnd,cycle] of [[sunrise,sunset,'Day'],[sunset,nextSunrise+1440,'Night']]){
+    for(let start=cycleStart,i=0;start<cycleEnd;start+=24,i++){
+      slots.push({start,end:Math.min(start+24,cycleEnd),row:i%GHADIYA_ROWS.length,cycle});
+    }
+  }
+  $('ghadiyaList').innerHTML=slots.map(({start,end,row:i,cycle})=>{
+    const text=GHADIYA_ROWS[i][dayIndex],tone=classify(text);
     const segments=splitGhadiya(start,end,tone,horas,periods);
     const rows=segments.map(segment=>{
       const tags=segment.periods.map(p=>`<span class="tag">${escapeHtml(p.name)}</span>`).join('')+
         segment.horas.map(h=>`<span class="tag hora-tag ${h.tone}"><span lang="te">${h.planet.name} హోర</span> / ${h.planet.en} hora</span>`).join('');
-      return `<div class="slot-segment ${segment.tone}"><div class="segment-time">${segmentTime(segment.start)}–${segmentTime(segment.end)}</div><div class="segment-rating">${escapeHtml(segment.label)}</div><div class="tags">${tags}</div></div>`;
+      return `<div class="slot-segment ${segment.tone}"><div class="segment-time">${chartTime(segment.start,true)}–${chartTime(segment.end,true)}</div><div class="segment-rating">${escapeHtml(segment.label)}</div><div class="tags">${tags}</div></div>`;
     }).join('');
-    const timeLabel=`${fmt(start)}–${fmt(end)}`;
+    const timeLabel=`${cycle} · ${chartTime(start)}–${chartTime(end)}`;
     return `<article class="ghadiya-card"><div class="slot-time">${timeLabel}</div><div class="slot-content"><div class="slot-result" lang="te">${escapeHtml(GHADIYA_TELUGU_ROWS[i][dayIndex])}</div><div class="slot-english">${escapeHtml(text)}</div><div class="slot-segments">${rows}</div></div></article>`;
   }).join(''); $('ghadiyaSection').hidden=false;
 }
@@ -194,7 +203,7 @@ function splitGhadiya(start,end,ghadiyaTone,horas,periods) {
     const mixed=ghadiyaTone==='average'||!activeHoras.length||activeHoras.some(h=>h.tone==='average');
     const tone=causes.length?'bad':mixed?'average':'good';
     const label=causes.length?`Avoid · ${causes.join(', ')}`:mixed?
-      `Mixed / verify · ${!activeHoras.length?'Hora unavailable':ghadiyaTone==='average'?'Uncertain ghadiya result':'Mixed hora'}`:
+      `Mixed / verify · ${!activeHoras.length?'Hora unavailable':activeHoras.some(h=>h.planet.en==='Moon'&&h.tone==='average')?'Select Moon phase':ghadiyaTone==='average'?'Uncertain ghadiya result':'Mixed hora'}`:
       'Favorable ghadiya and hora · no avoid periods';
     return {start:from,end:to,tone,label,horas:activeHoras,periods:activePeriods};
   });
@@ -203,6 +212,9 @@ function segmentTime(minute) {
   const seconds=((Math.round(minute*60)%86400)+86400)%86400;
   const h=Math.floor(seconds/3600),m=Math.floor(seconds%3600/60),s=seconds%60;
   return `${h%12||12}:${String(m).padStart(2,'0')}${s?`:${String(s).padStart(2,'0')}`:''} ${h<12?'AM':'PM'}`;
+}
+function chartTime(minute,seconds=false) {
+  return `${seconds?segmentTime(minute):fmt(minute)}${minute>=1440?' (+1 day)':''}`;
 }
 function escapeHtml(text) { return String(text).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 async function loadChart() {
@@ -215,12 +227,12 @@ async function loadChart() {
     const solar=await resolveSunTimes(date,selectedPlace,$('sunriseInput').value,$('sunsetInput').value), dayIndex=weekday(date), dayLength=solar.sunset-solar.sunrise;
     if(request!==chartRequest) return;
     if(dayLength<=0||dayLength>=1440) throw new Error('Sunrise/sunset values are not valid for this location and date.');
-    const periods=makePeriods(dayIndex,solar.sunrise,dayLength), horas=makeHoras(dayIndex,solar.sunrise,solar.sunset,solar.nextSunrise);
-    const manualOnly=solar.nextSunrise===null;
-    renderSummary(solar.sunrise,solar.sunset,solar.timezone,dayIndex,solar.manual,manualOnly?'Entered times':selectedPlace.name); renderPeriods(periods); renderHoras(horas,periods); renderGhadiya(dayIndex,solar.sunrise,horas,periods);
-    $('horaCoverage').textContent=manualOnly?'12 daytime horas only':'12 daytime + 12 nighttime horas';
-    $('horaHelp').textContent=manualOnly?'Nighttime horas need the next day’s sunrise; ghadiya rows after sunset have unknown hora data.':'Each hora follows the local day or night length';
-    setStatus(manualOnly?`Showing ${DAYS[dayIndex]} using your sunrise and sunset. No location or internet needed; daytime horas only.`:`Showing ${DAYS[dayIndex]} in ${selectedPlace.name}${solar.manual?' using your adjusted times':''}. Times are local to the selected place.`);
+    const periods=makePeriods(dayIndex,solar.sunrise,dayLength), horas=makeHoras(dayIndex,solar.sunrise,solar.sunset,solar.nextSunrise,$('moonPhase').value);
+    const manualOnly=solar.estimatedNextSunrise;
+    renderSummary(solar.sunrise,solar.sunset,solar.timezone,dayIndex,solar.manual,manualOnly?'Entered times':selectedPlace.name); renderPeriods(periods); renderHoras(horas,periods); renderGhadiya(dayIndex,solar.sunrise,solar.sunset,solar.nextSunrise,horas,periods);
+    $('horaCoverage').textContent='Daytime and nighttime horas';
+    $('horaHelp').textContent=manualOnly?'Tomorrow’s sunrise is estimated using today’s sunrise.':'Tomorrow’s sunrise uses the selected location.';
+    setStatus(manualOnly?`Showing ${DAYS[dayIndex]} using your sunrise and sunset. Tomorrow’s sunrise is estimated as ${fmt(solar.nextSunrise)}.`:`Showing ${DAYS[dayIndex]} in ${selectedPlace.name}${solar.manual?' using your adjusted times':''}. Times are local to the selected place.`);
   } catch(error) { if(request===chartRequest) setStatus(error.message||'Unable to calculate this chart.',true); }
 }
 async function searchPlace() {
@@ -263,6 +275,7 @@ $('gpsButton').addEventListener('click',useMyLocation);
 dateInput.addEventListener('change',loadChart);
 $('sunriseInput').addEventListener('change',loadChart);
 $('sunsetInput').addEventListener('change',loadChart);
+$('moonPhase').addEventListener('change',loadChart);
 $('sunriseReset').addEventListener('click',()=>{$('sunriseInput').value='';$('sunsetInput').value='';loadChart();});
 window.addEventListener('beforeinstallprompt',event=>{event.preventDefault();installPrompt=event;$('installButton').hidden=false;});
 $('installButton').addEventListener('click',async()=>{if(!installPrompt)return;installPrompt.prompt();await installPrompt.userChoice;installPrompt=null;$('installButton').hidden=true;});

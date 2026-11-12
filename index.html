@@ -16,12 +16,12 @@
     <section class="intro">
       <p class="eyebrow">A day planned around your sunrise</p>
       <h1>Find your <span>clear window.</span></h1>
-      <p class="lede">Choose a date and place to see hora, ghadiya, and traditional periods to avoid, together on one timeline.</p>
+      <p class="lede">Choose a date and place or enter sunrise and sunset to see hora, ghadiya, and traditional periods to avoid.</p>
     </section>
     <section class="controls card" aria-label="Date and location">
       <label class="field"><span>Date</span><input id="dateInput" type="date"></label>
       <div class="field location-field"><label for="placeInput">Location</label><div class="location-row"><input id="placeInput" type="search" placeholder="Search a city or place" autocomplete="off"><button id="searchButton" class="secondary-button">Search</button></div><div id="searchResults" class="search-results" hidden></div></div>
-      <div class="field sunrise-field"><div class="solar-row"><label for="sunriseInput">Sunrise (optional)<input id="sunriseInput" type="time"></label><label for="sunsetInput">Sunset (optional)<input id="sunsetInput" type="time"></label><button id="sunriseReset" type="button" class="secondary-button">Auto</button></div><small>Enter both times to calculate without a location or internet. Manual mode shows daytime horas only. Auto clears both times.</small></div>
+      <div class="field sunrise-field"><div class="solar-row"><label for="sunriseInput">Sunrise (optional)<input id="sunriseInput" type="time"></label><label for="sunsetInput">Sunset (optional)<input id="sunsetInput" type="time"></label><button id="sunriseReset" type="button" class="secondary-button">Auto</button></div><small>Enter both to calculate without a location. Tomorrow's sunrise is estimated as today's sunrise. Auto clears both times.</small><label for="moonPhase">Moon phase / చంద్ర పక్షం</label><select id="moonPhase"><option value="">Select Moon phase</option><option value="waxing">Waxing / శుక్ల పక్షం</option><option value="waning">Waning / కృష్ణ పక్షం</option></select><small>Select the phase from your almanac. Until selected, Moon horas are marked mixed.</small></div>
       <button id="gpsButton" class="gps-button"><span aria-hidden="true">⌖</span> Use my location</button>
       <p id="status" class="status" role="status" aria-live="polite">Enter sunrise and sunset, or select a location to begin.</p>
       <p class="location-help">Location needs HTTPS and both browser and phone permission. If opening from another app, use Chrome or Safari instead.</p>
@@ -33,12 +33,12 @@
       <div id="periodList" class="period-grid"></div>
     </section>
     <section id="horaSection" class="section" hidden>
-      <div class="section-heading"><div><p id="horaCoverage" class="eyebrow">12 daytime + 12 nighttime horas</p><h2>Hora / <span lang="te">హోర</span> · planetary hours</h2></div><span id="horaHelp" class="section-note">Each hora follows the local day or night length</span></div>
+      <div class="section-heading"><div><p id="horaCoverage" class="eyebrow">Daytime and nighttime horas</p><h2>Hora / <span lang="te">హోర</span> · planetary hours</h2></div><span id="horaHelp" class="section-note">One hour each, restarting at sunset</span></div>
       <div id="horaList" class="hora-grid"></div>
     </section>
     <section id="ghadiyaSection" class="section" hidden>
-      <div class="section-heading"><div><p class="eyebrow">30 source-table intervals · 24 minutes each</p><h2>Ghadiya / <span lang="te">ఘడియ</span> · 24-minute results</h2></div><span id="weekdayLabel" class="section-note"></span></div>
-      <p class="section-copy">Each 24-minute card contains separate time rows at every hora change and avoid-period boundary. Red means an unfavorable result, unfavorable hora, or an avoid period; amber means mixed or uncertain; green requires a favorable result and hora with no avoid periods. Each row names its active causes. Boundary times include seconds where needed, rounded to the nearest second.</p>
+      <div class="section-heading"><div><p class="eyebrow">24-minute intervals · restart at sunset</p><h2>Ghadiya / <span lang="te">ఘడియ</span> · 24-minute results</h2></div><span id="weekdayLabel" class="section-note"></span></div>
+      <p class="section-copy">The selected weekday's table repeats from its first row at sunset and, if needed, after 30 rows. The last interval is shortened at sunset or next sunrise. Times marked +1 day are after midnight. Each card splits at hora and avoid-period boundaries. Red means unfavorable; amber means mixed or uncertain; green requires a favorable result and hora with no avoid period.</p>
       <div id="ghadiyaList" class="ghadiya-list"></div>
     </section>
     <aside class="note-card"><span class="note-icon">i</span><p><strong>Tradition and accuracy.</strong> Rahu Kalam, Yamagandam and Gulika are calculated by dividing daylight into eight parts. Durmuhurtham uses a weekday-based one-of-15 daylight segment. Panchangam conventions can differ by region; use this chart as a planning aid, not a substitute for your family's or priest's tradition. The ghadiya ratings are inferred from the supplied result text; review neutral/uncertain labels with care.</p></aside>
