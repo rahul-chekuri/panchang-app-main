@@ -30,6 +30,38 @@ const GHADIYA_ROWS = [
 ['Prayana Nasanamu','Yathra Prapthi','Sukha Soukhyam','Bandhu Samagamamu','Jwara Sasthra Bhadha','Dhukhamu','Prayana Labham'],
 ['Bhoo Labhamu','Raja Bhayamu','Mithrathvam','Vahana Pramadhamu','Vidhya Vrudhi','Raja Sanmanam','Priya Varthalu']
 ];
+const GHADIYA_TELUGU_ROWS = [
+['ప్రయాణకార్య సిద్ధి','కార్యహాని','ధన లాభం','దుర్వార్తలు','ధన లాభం','కార్య సిద్ధి','కార్యహాని'],
+['విద్యా జయం','రాజ్య పూజ్యత','రాజ్య పూజ్యత','మనః క్షోభం','మనోభీష్ట సిద్ధి','కార్య నాశనము','సౌఖ్యము'],
+['ఉద్యోగ కష్టం','వాహన ప్రాప్తి','దుఃఖము','ధన లాభం','అనారోగ్యం','ధన లాభము','వివాహ సిద్ధి'],
+['శత్రు వృద్ధి','స్త్రీ సౌఖ్యము','భూత భయము','యత్నకార్య సిద్ధి','వాహన ప్రాప్తి','రాజానుగ్రహం','మిత్రత్వం'],
+['చోర భయము','భూ లాభము','వాహన ప్రాప్తి','కార్య భంగము','వివాహ శుభం','అపజయం','ప్రయాణ జయం'],
+['దుఃఖము','స్థానభ్రంశము','పరోపకారము','మహా భయము','సుఖనాశనము','కార్య జయం','వాహన లాభం'],
+['అభీష్ట సిద్ధి','గుప్తధన లాభము','వస్త్ర ప్రాప్తి','మనశ్చాంచల్యం','ఉద్యోగ జయం','దుఃఖం భయం','కార్య జయం'],
+['సౌఖ్య లాభం','వ్యవహార జయం','ప్రయాణ నష్టం','ఉపద్రవములు','స్వామి దర్శనం','ధైర్యం','రాజ సన్మానం'],
+['వివాహాది శుభాని','ఉద్యోగము','వివాద హాని','జయప్రదము','ప్రయాణ భంగం','కష్ట నష్టములు','కార్య నష్టం'],
+['మిత్ర వృద్ధి','ప్రియ భోజనం','శత్రు బాధ','ప్రయాణ భయము','కార్య సిద్ధి','సౌఖ్యము','ప్రయాణ హాని'],
+['మృత్యు భయం','స్త్రీ లాభము','స్త్రీ లాభము','రాజ సన్మానము','వ్యాపార జయం','అనుకూలం','వస్త్ర స్త్రీ లాభాలు'],
+['ఆరోగ్యం','రాజ దర్శనం','కార్య నాశనము','ధనధాన్య వృద్ధి','శత్రు నాశనం','వస్తు వాహన ప్రాప్తి','మనశ్చాంచల్యం'],
+['శుభకార్య జయం','కార్య భంగం','కష్టము','ఉద్యోగ జయం','వివాహ జయం','క్షేమం లాభం','మిత్ర నష్టం'],
+['ప్రయత్న ఫలం','రోగ పీడ','జంతు భయం','లాభము','రోగ నాశం','కార్య జయం','మిత్ర ప్రాప్తి'],
+['విష భయం','కార్య సిద్ధి','అగ్ని బాధ','ప్రయత్న జయం','కలహప్రదం','శస్త్ర భయం','స్త్రీ లాభం'],
+['ఉద్యోగం','శత్రు నాశనము','రోగ పీడ','వస్త్ర లాభం','ఉద్యోగ నష్టం','శత్రు నాశనం','ధన లాభము'],
+['జ్వర ప్రాప్తి','గో లాభం','పుత్ర లాభము','సంతోషం','కోప తీవ్రత','అతి భయము','ప్రయాణ జయం'],
+['రాజ సన్మానం','కార్య జయము','కార్య జయము','క్షేమం','కార్య జయం','విద్యా సిద్ధి','ప్రయాణ నష్టం'],
+['ప్రయాణ లాభము','ఆరోగ్యం','చిక్కులు','స్వల్ప లాభం','స్థాన నాశం','రోగ బాధలు','క్షేమం'],
+['వివాదము','మిత్రత్వం','రాజ సన్మానము','కలహము','చోర భయము','దుఃఖము','వాహనయోగం'],
+['మిత్రత్వము','సౌఖ్యము','ఒమ్ము అగుట','ఇష్ట సిద్ధి','వివాహ కలహము','వాహన ప్రాప్తి','జ్ఞాన వృద్ధి'],
+['జ్వర భయము','కార్య భంగము','కార్య నష్టము','పుత్ర లాభము','వివాద జయము','స్త్రీ లాభము','వినోదము'],
+['ధన లాభము','వివాహ జయం','అపజయం','ఉద్యోగ లాభం','యాత్రా శుభం','స్ఫోటక పీడ','కలహము'],
+['బంధనం','కార్య ప్రాప్తి','శత్రు భయము','ప్రయాణ జయం','ధైర్య హాని','విషజంతు భయం','ఉద్యోగ నష్టం'],
+['స్థాన భ్రంశం','ధన లాభము','ఉద్యోగ హాని','వ్యవహార జయం','కార్య భంగం','ప్రయాణ కష్టం','ప్రయత్న జయం'],
+['విద్యా భంగము','విద్యా లాభము','జయప్రదము','వివాహ శుభం','ప్రయాణ క్షేమం','శత్రు భయం','మనస్తాపం'],
+['స్త్రీ భోగం','స్థిరకార్య నాశనము','కార్య సిద్ధి','కార్య జయం','వివాహ శుభం','కార్య నష్టం','శత్రు నాశనం'],
+['ప్రయాణ జయం','ఉద్యోగ జయం','కార్య లాభం','మనః క్లేశము','కలహప్రదం','ప్రయాణ సౌఖ్యం','విరోధ నాశనం'],
+['ప్రయాణ నాశనము','యాత్రా ప్రాప్తి','సుఖ సౌఖ్యం','బంధు సమాగమము','జ్వర శస్త్ర బాధ','దుఃఖము','ప్రయాణ లాభం'],
+['భూ లాభము','రాజ భయము','మిత్రత్వము','వాహన ప్రమాదము','విద్యా వృద్ధి','రాజ సన్మానం','ప్రియ వార్తలు']
+];
 const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 const PLANETS = [
   {name:'సూర్యుడు',en:'Sun',tone:'bad'}, {name:'శుక్రుడు',en:'Venus',tone:'good'}, {name:'బుధుడు',en:'Mercury',tone:'average'},
@@ -103,18 +135,23 @@ function renderHoras(horas,periods) {
     const tags=hit.length?`<div class="tags">${hit.map(p=>`<span class="tag">${p.name}</span>`).join('')}</div>`:'';
     const tone=hit.length?'bad':h.tone;
     const rating=hit.length?`Avoid where overlapping · ${hit.map(p=>p.name).join(', ')}`:h.tone==='good'?'Favorable':h.tone==='bad'?'Avoid for new starts':'Mixed';
-    return `<article class="hora-card ${tone}"><div class="hora-time">Hora ${String(i+1).padStart(2,'0')} · ${fmt(h.start)}–${fmt(h.end)}</div><div class="hora-planet"><strong>${h.planet.name}</strong><span>${h.planet.en}</span></div><div class="rating">${rating}</div>${tags}</article>`;
+    return `<article class="hora-card ${tone}"><div class="hora-time">Hora / <span lang="te">హోర</span> ${String(i+1).padStart(2,'0')} · ${fmt(h.start)}–${fmt(h.end)}</div><div class="hora-planet"><strong lang="te">${h.planet.name}</strong><span>${h.planet.en}</span></div><div class="rating">${rating}</div>${tags}</article>`;
   }).join(''); $('horaSection').hidden=false;
 }
 function renderGhadiya(dayIndex,sunrise,horas,periods) {
   $('weekdayLabel').textContent=`${DAYS[dayIndex]} · Shubhakruth source table`;
   $('ghadiyaList').innerHTML=GHADIYA_ROWS.map((row,i)=>{
     const start=sunrise+i*24,end=start+24,text=row[dayIndex],tone=classify(text),hits=intersecting(periods,start,end),hora=intersecting(horas,start,end);
-    const tags=[...hits.map(p=>`<span class="tag">${p.name}</span>`),...new Set(hora.map(h=>h.planet.en)).values()].map((x,j)=>typeof x==='string'&&j>=hits.length?`<span class="tag hora-tag">${x} hora</span>`:x).join('');
-    const effectiveTone=hits.length?'bad':tone;
-    const label=hits.length?`Avoid · overlaps ${hits.map(p=>p.name).join(', ')}`:tone==='good'?'Favorable result':tone==='bad'?'Unfavorable result':'Mixed / verify';
+    const tags=hits.map(p=>`<span class="tag">${p.name}</span>`).join('')+
+      hora.map(h=>`<span class="tag hora-tag ${h.tone}"><span lang="te">${h.planet.name} హోర</span> / ${h.planet.en} hora</span>`).join('');
+    const badHoras=hora.filter(h=>h.tone==='bad');
+    const averageHoras=hora.filter(h=>h.tone==='average');
+    const causes=[...hits.map(p=>p.name),...badHoras.map(h=>`${h.planet.en} hora`)];
+    const effectiveTone=causes.length?'bad':tone==='good'&&averageHoras.length?'average':tone;
+    const label=causes.length?`Avoid · overlaps ${causes.join(', ')}`:
+      tone==='bad'?'Unfavorable ghadiya result':effectiveTone==='average'?'Mixed / verify':'Favorable result and hora';
     const timeLabel=`${fmt(start)}–${fmt(end)}`;
-    return `<article class="ghadiya-card ${effectiveTone}"><div class="slot-time">${timeLabel}</div><div class="slot-content"><div class="slot-result">${escapeHtml(text)}</div><div class="slot-rating">${label}</div>${tags?`<div class="tags">${tags}</div>`:''}</div></article>`;
+    return `<article class="ghadiya-card ${effectiveTone}"><div class="slot-time">${timeLabel}</div><div class="slot-content"><div class="slot-result" lang="te">${escapeHtml(GHADIYA_TELUGU_ROWS[i][dayIndex])}</div><div class="slot-english">${escapeHtml(text)}</div><div class="slot-rating">${label}</div>${tags?`<div class="tags">${tags}</div>`:''}</div></article>`;
   }).join(''); $('ghadiyaSection').hidden=false;
 }
 function escapeHtml(text) { return String(text).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
