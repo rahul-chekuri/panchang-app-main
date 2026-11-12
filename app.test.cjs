@@ -4,7 +4,7 @@ const { join } = require('node:path');
 const { test } = require('node:test');
 const vm = require('node:vm');
 
-function app() {
+function app(overrides = {}) {
   const elements = new Map();
   const context = {
     document: {
@@ -15,12 +15,13 @@ function app() {
     },
     window: { addEventListener() {} },
     navigator: {},
-    localStorage: { getItem() { return null; } },
-    Date
+    localStorage: { getItem() { return null; }, setItem() {} },
+    Date,
+    ...overrides
   };
   vm.createContext(context);
   vm.runInContext(readFileSync(join(__dirname, 'app.js'), 'utf8') +
-    '\nglobalThis.app = { GHADIYA_ROWS, GHADIYA_TELUGU_ROWS, PLANETS, renderGhadiya, splitGhadiya, segmentTime };', context);
+    '\nglobalThis.app = { GHADIYA_ROWS, GHADIYA_TELUGU_ROWS, PLANETS, renderGhadiya, splitGhadiya, segmentTime, useMyLocation, locationErrorMessage };', context);
   return { ...context.app, elements };
 }
 
@@ -113,4 +114,44 @@ test('bad ghadiya stays bad, mixed stays amber, and missing hora is never green'
   assert.equal(splitGhadiya(540,564,'bad',horas,[])[0].tone,'bad');
   assert.equal(splitGhadiya(540,564,'average',horas,[])[0].tone,'average');
   assert.equal(splitGhadiya(540,564,'good',[],[])[0].tone,'average');
+});
+
+test('location errors distinguish blocked permission, unavailable position and timeout', () => {
+  const { locationErrorMessage } = app();
+  assert.match(locationErrorMessage({ code: 1 }), /permission is blocked/);
+  assert.match(locationErrorMessage({ code: 2 }), /could not determine/);
+  assert.match(locationErrorMessage({ code: 3 }), /timed out/);
+});
+
+test('GPS failures allow retry and give actionable messages instead of a generic error', () => {
+  let success, failure, options;
+  const instance = app({
+    window: { isSecureContext: true, addEventListener() {} },
+    navigator: { geolocation: { getCurrentPosition(ok, fail, settings) {
+      success = ok; failure = fail; options = settings;
+    } } }
+  });
+  instance.elements.get('status').classList = { toggle() {} };
+  instance.useMyLocation();
+  assert.equal(instance.elements.get('gpsButton').disabled, true);
+  assert.equal(options.timeout, 30000);
+  failure({ code: 1 });
+  assert.equal(instance.elements.get('gpsButton').disabled, false);
+  assert.match(instance.elements.get('status').textContent, /site settings/);
+  instance.useMyLocation();
+  success({ coords: { latitude: 0, longitude: 0 } });
+  assert.equal(instance.elements.get('gpsButton').disabled, false);
+  assert.equal(instance.elements.get('placeInput').value, 'Current location');
+});
+
+test('insecure pages explain the HTTPS requirement before requesting GPS', () => {
+  let requested = false;
+  const instance = app({
+    window: { isSecureContext: false, addEventListener() {} },
+    navigator: { geolocation: { getCurrentPosition() { requested = true; } } }
+  });
+  instance.elements.get('status').classList = { toggle() {} };
+  instance.useMyLocation();
+  assert.equal(requested, false);
+  assert.match(instance.elements.get('status').textContent, /HTTPS/);
 });

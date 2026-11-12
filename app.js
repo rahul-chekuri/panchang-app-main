@@ -204,14 +204,44 @@ async function searchPlace() {
 }
 $('searchButton').addEventListener('click',searchPlace);
 $('placeInput').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();searchPlace();}});
-$('gpsButton').addEventListener('click',()=>{
-  if(!navigator.geolocation){setStatus('Location access is not available in this browser.',true);return;}
-  setStatus('Requesting your location…');
-  navigator.geolocation.getCurrentPosition(({coords})=>setPlace(coords.latitude,coords.longitude,'Current location'),()=>setStatus('Could not access location. Allow location permission or search for a city instead.',true),{enableHighAccuracy:false,timeout:12000});
-});
+function locationErrorMessage(error) {
+  switch(error.code){
+    case 1: return 'Location permission is blocked. Allow Location for this site in your browser site settings and enable location access for the browser in your phone settings. Then tap Use my location again, or search for a city.';
+    case 2: return 'Your device could not determine its location. Turn on device Location Services, check your connection, and try again near a window or outdoors. You can also search for a city.';
+    case 3: return 'Finding your location timed out. Check that Location Services are on, then try again or search for a city.';
+    default: return 'Your browser could not provide a location. Check browser and device location settings or search for a city.';
+  }
+}
+function useMyLocation() {
+  if(!window.isSecureContext){setStatus('Location requires HTTPS. Open the published https:// site in Chrome or Safari, not a local file or an in-app preview.',true);return;}
+  if(!navigator.geolocation){setStatus('This browser does not support location access. Open the app in Chrome or Safari, or search for a city.',true);return;}
+  const button=$('gpsButton');
+  button.disabled=true;
+  setStatus('Finding your location. Allow access if prompted; this can take up to 30 seconds…');
+  navigator.geolocation.getCurrentPosition(({coords})=>{
+    button.disabled=false;
+    setPlace(coords.latitude,coords.longitude,'Current location');
+  },error=>{
+    button.disabled=false;
+    setStatus(locationErrorMessage(error),true);
+  },{enableHighAccuracy:false,timeout:30000,maximumAge:300000});
+}
+$('gpsButton').addEventListener('click',useMyLocation);
 dateInput.addEventListener('change',loadChart);
 window.addEventListener('beforeinstallprompt',event=>{event.preventDefault();installPrompt=event;$('installButton').hidden=false;});
 $('installButton').addEventListener('click',async()=>{if(!installPrompt)return;installPrompt.prompt();await installPrompt.userChoice;installPrompt=null;$('installButton').hidden=true;});
-if('serviceWorker' in navigator) window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
+if('serviceWorker' in navigator) window.addEventListener('load',async()=>{
+  try {
+    const registration=await navigator.serviceWorker.register('./sw.js',{updateViaCache:'none'});
+    document.addEventListener('visibilitychange',()=>{
+      if(document.visibilityState==='visible') registration.update().catch(error=>{
+        console.warn('Could not check for app updates.',error);
+      });
+    });
+  } catch(error) {
+    console.error('Offline app setup failed.',error);
+    $('updateStatus').textContent='Offline mode is unavailable. You can continue using the app online.';
+  }
+});
 const now=new Date(); dateInput.value=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
 try {const saved=JSON.parse(localStorage.getItem('panchang-place'));if(saved?.lat&&saved?.lon){place=saved;$('placeInput').value=saved.name;loadChart();}} catch { localStorage.removeItem('panchang-place'); }

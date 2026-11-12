@@ -1,4 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Noto+Sans+Telugu:wght@400;500;600;700&display=swap');
+.location-help, .update-status { grid-column: 1 / -1; margin: 0; font-size: 12px; line-height: 1.6; color: var(--muted); }
+.update-status:empty { display: none; }
+#gpsButton:disabled { opacity: .65; cursor: wait; }
 .ghadiya-list .ghadiya-card {
   grid-template-columns: minmax(0, 1fr);
   gap: 8px;

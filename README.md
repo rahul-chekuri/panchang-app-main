@@ -26,3 +26,13 @@ Sun times are retrieved online. The interface and app shell are cached for repea
 The ghadiya card now stays neutral instead of inheriting the worst overlapping rating described above. Inside each card, colored rows split at every hora change and every avoid-period start/end. Only conditions active within that row affect its rating and badges. Bad ghadiya results, bad horas, or avoid periods make a row red; mixed or missing hora data and uncertain ghadiya results make it amber; otherwise it is green. Boundaries are computed without rounding; displayed times include seconds when needed and round to the nearest second. Thus a Rahu Kalam ending at 9:10 leaves 9:10–9:24 green when both ghadiya and hora are favorable. The separate hora overview retains its whole-hora overlap warnings.
 
 Run the focused checks with `node --test app.test.cjs`.
+
+### Updates and phone location
+
+The service worker now requests current app files from the network without using the browser HTTP cache, saving successful responses for offline use. It falls back to the saved files only when the network fails. This means future file updates do not require a new cache version or incognito browsing. New workers activate immediately; an upgrade refreshes existing app tabs once, which also loads the fix in old clients without an update listener. App registration bypasses cached worker scripts and checks for updates when the app returns to the foreground. An already-open tab may need a refresh after deployment.
+
+On the first upgrade from the old cache-first worker, open the site online and allow it to refresh. If a browser still shows the old version, close all app tabs and reopen it; as a one-time recovery, clear this site's stored data in the browser settings (this also removes the saved location). Do not clear all browsing data.
+
+Location requires the HTTPS site, permission for the site, and enabled device/browser Location Services. Open the link in Chrome or Safari rather than an embedded in-app browser. Permission denial, unavailable position and timeouts now show distinct recovery messages. The request allows 30 seconds and accepts a device location up to five minutes old; it does not bypass permission or substitute an IP-based location. Android users should check the site's Location permission and the browser's permission in phone Settings; iPhone users should check Settings → Privacy & Security → Location Services and the browser's location access. City search remains available if the device cannot return a position.
+
+Run all focused checks with `node --test app.test.cjs sw.test.cjs`.

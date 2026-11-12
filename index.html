@@ -23,6 +23,8 @@
       <div class="field location-field"><label for="placeInput">Location</label><div class="location-row"><input id="placeInput" type="search" placeholder="Search a city or place" autocomplete="off"><button id="searchButton" class="secondary-button">Search</button></div><div id="searchResults" class="search-results" hidden></div></div>
       <button id="gpsButton" class="gps-button"><span aria-hidden="true">⌖</span> Use my location</button>
       <p id="status" class="status" role="status" aria-live="polite">Search for a place or use your location to begin.</p>
+      <p class="location-help">Location needs HTTPS and both browser and phone permission. If opening from another app, use Chrome or Safari instead.</p>
+      <p id="updateStatus" class="update-status" role="status" aria-live="polite"></p>
     </section>
     <section id="dailySummary" class="summary-grid" hidden aria-label="Sunrise and sunset"></section>
     <section id="periodSection" class="section" hidden>
