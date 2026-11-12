@@ -120,8 +120,18 @@ function makeHoras(dayIndex,sunrise,sunset,nextSunrise) {
   });
 }
 function intersecting(items,start,end) { return items.filter(x=>intersects(start,end,x.start,x.end)); }
-function renderSummary(sunrise,sunset,timezone,dayIndex) {
-  $('dailySummary').innerHTML=`<div class="summary-card"><span>Sunrise · ${DAYS[dayIndex]}</span><strong>${fmt(sunrise)}</strong><small>${escapeHtml(place.name)}</small></div><div class="summary-card"><span>Sunset</span><strong>${fmt(sunset)}</strong><small>${escapeHtml(timezone)}</small></div><div class="summary-card"><span>Daylight</span><strong>${fmt(sunset-sunrise,false)} hrs</strong><small>Local solar day</small></div>`;
+function manualSunrise(value) {
+  const m=/^(\d{2}):(\d{2})/.exec(value||'');
+  return m?Number(m[1])*60+Number(m[2]):null;
+}
+function applySunrise(solar,value) {
+  const sunrise=manualSunrise(value);
+  if(sunrise===null) return {...solar,manual:false};
+  if(sunrise>=solar.sunset) throw new Error(`Entered sunrise must be before sunset (${fmt(solar.sunset)}).`);
+  return {...solar,sunrise,manual:true};
+}
+function renderSummary(sunrise,sunset,timezone,dayIndex,manual=false) {
+  $('dailySummary').innerHTML=`<div class="summary-card"><span>Sunrise${manual?' (entered)':''} · ${DAYS[dayIndex]}</span><strong>${fmt(sunrise)}</strong><small>${escapeHtml(place.name)}</small></div><div class="summary-card"><span>Sunset</span><strong>${fmt(sunset)}</strong><small>${escapeHtml(timezone)}</small></div><div class="summary-card"><span>Daylight</span><strong>${fmt(sunset-sunrise,false)} hrs</strong><small>Local solar day</small></div>`;
   $('dailySummary').hidden=false;
 }
 function renderPeriods(periods) {
@@ -183,11 +193,11 @@ async function loadChart() {
   setStatus(`Finding sunrise and sunset for ${place.name}…`);
   for(const id of ['dailySummary','periodSection','horaSection','ghadiyaSection']) $(id).hidden=true;
   try {
-    const solar=await getSunTimes(dateInput.value,place.lat,place.lon), dayIndex=weekday(dateInput.value), dayLength=solar.sunset-solar.sunrise;
+    const solar=applySunrise(await getSunTimes(dateInput.value,place.lat,place.lon),$('sunriseInput').value), dayIndex=weekday(dateInput.value), dayLength=solar.sunset-solar.sunrise;
     if(dayLength<=0||dayLength>=1440) throw new Error('Sunrise/sunset values are not valid for this location and date.');
     const periods=makePeriods(dayIndex,solar.sunrise,dayLength), horas=makeHoras(dayIndex,solar.sunrise,solar.sunset,solar.nextSunrise);
-    renderSummary(solar.sunrise,solar.sunset,solar.timezone,dayIndex); renderPeriods(periods); renderHoras(horas,periods); renderGhadiya(dayIndex,solar.sunrise,horas,periods);
-    setStatus(`Showing ${DAYS[dayIndex]} in ${place.name}. Times are local to the selected place.`);
+    renderSummary(solar.sunrise,solar.sunset,solar.timezone,dayIndex,solar.manual); renderPeriods(periods); renderHoras(horas,periods); renderGhadiya(dayIndex,solar.sunrise,horas,periods);
+    setStatus(`Showing ${DAYS[dayIndex]} in ${place.name}${solar.manual?' using your sunrise time':''}. Times are local to the selected place.`);
   } catch(error) { setStatus(error.message||'Unable to calculate this chart.',true); }
 }
 async function searchPlace() {
@@ -228,6 +238,8 @@ function useMyLocation() {
 }
 $('gpsButton').addEventListener('click',useMyLocation);
 dateInput.addEventListener('change',loadChart);
+$('sunriseInput').addEventListener('change',loadChart);
+$('sunriseReset').addEventListener('click',()=>{$('sunriseInput').value='';loadChart();});
 window.addEventListener('beforeinstallprompt',event=>{event.preventDefault();installPrompt=event;$('installButton').hidden=false;});
 $('installButton').addEventListener('click',async()=>{if(!installPrompt)return;installPrompt.prompt();await installPrompt.userChoice;installPrompt=null;$('installButton').hidden=true;});
 if('serviceWorker' in navigator) window.addEventListener('load',async()=>{

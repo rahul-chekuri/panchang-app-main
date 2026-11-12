@@ -90,14 +90,14 @@ test('offline uses the saved app shell; missing files and HTTP errors are not di
   await assert.rejects(sw.request('app.js'), /offline/);
 });
 
-test('upgrading activates immediately, reloads old in-scope clients, and preserves unrelated caches', async () => {
+test('upgrading activates immediately without forcing client navigation (avoids activation deadlock)', async () => {
   const sw = worker();
   await sw.lifecycle('install');
   await sw.lifecycle('activate');
   assert.equal(sw.skipped, true);
   assert.equal(sw.claimed, true);
   assert.deepEqual(sw.deleted, ['panchang-app-v4']);
-  assert.deepEqual(sw.navigated, ['https://example.com/panchang/']);
+  assert.deepEqual(sw.navigated, []);
 });
 
 test('non-GET, external and unrelated requests are not intercepted', () => {

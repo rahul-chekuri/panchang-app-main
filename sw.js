@@ -1,5 +1,5 @@
 const CACHE_PREFIX='panchang-app-';
-const CACHE=`${CACHE_PREFIX}v5-${encodeURIComponent(self.registration.scope)}`;
+const CACHE=`${CACHE_PREFIX}v6-${encodeURIComponent(self.registration.scope)}`;
 const CORE=['./','./index.html','./styles.css','./app.js','./manifest.webmanifest','./icon.svg'];
 const CORE_URLS=new Set(CORE.map(path=>new URL(path,self.registration.scope).href));
 
@@ -14,14 +14,6 @@ self.addEventListener('activate',event=>event.waitUntil((async()=>{
     (/^panchang-app-v[1-4]$/.test(key)||key.startsWith(CACHE_PREFIX)&&key.endsWith(`-${encodeURIComponent(self.registration.scope)}`)));
   await Promise.all(stale.map(key=>caches.delete(key)));
   await self.clients.claim();
-  // Old app versions have no update listener, so refresh their open pages once.
-  if(stale.length){
-    const windows=await self.clients.matchAll({type:'window'});
-    await Promise.all(windows.filter(client=>client.url.startsWith(self.registration.scope)).map(async client=>{
-      try { await client.navigate(client.url); }
-      catch(error) { console.warn('Could not refresh the app after updating.',error); }
-    }));
-  }
 })()));
 
 self.addEventListener('fetch',event=>{

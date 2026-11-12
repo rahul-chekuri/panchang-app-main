@@ -21,6 +21,7 @@
     <section class="controls card" aria-label="Date and location">
       <label class="field"><span>Date</span><input id="dateInput" type="date"></label>
       <div class="field location-field"><label for="placeInput">Location</label><div class="location-row"><input id="placeInput" type="search" placeholder="Search a city or place" autocomplete="off"><button id="searchButton" class="secondary-button">Search</button></div><div id="searchResults" class="search-results" hidden></div></div>
+      <div class="field sunrise-field"><label for="sunriseInput">Sunrise (optional)</label><div class="location-row"><input id="sunriseInput" type="time"><button id="sunriseReset" type="button" class="secondary-button">Auto</button></div><small>Leave empty to use the calculated sunrise. Sunset still comes from the location.</small></div>
       <button id="gpsButton" class="gps-button"><span aria-hidden="true">⌖</span> Use my location</button>
       <p id="status" class="status" role="status" aria-live="polite">Search for a place or use your location to begin.</p>
       <p class="location-help">Location needs HTTPS and both browser and phone permission. If opening from another app, use Chrome or Safari instead.</p>

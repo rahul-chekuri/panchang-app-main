@@ -21,7 +21,7 @@ function app(overrides = {}) {
   };
   vm.createContext(context);
   vm.runInContext(readFileSync(join(__dirname, 'app.js'), 'utf8') +
-    '\nglobalThis.app = { GHADIYA_ROWS, GHADIYA_TELUGU_ROWS, PLANETS, renderGhadiya, splitGhadiya, segmentTime, useMyLocation, locationErrorMessage };', context);
+    '\nglobalThis.app = { GHADIYA_ROWS, GHADIYA_TELUGU_ROWS, PLANETS, renderGhadiya, splitGhadiya, segmentTime, applySunrise, useMyLocation, locationErrorMessage };', context);
   return { ...context.app, elements };
 }
 
@@ -154,4 +154,12 @@ test('insecure pages explain the HTTPS requirement before requesting GPS', () =>
   instance.useMyLocation();
   assert.equal(requested, false);
   assert.match(instance.elements.get('status').textContent, /HTTPS/);
+});
+
+test('an entered sunrise replaces only the calculated sunrise and must precede sunset', () => {
+  const { applySunrise } = app();
+  const solar = { sunrise: 371, sunset: 1078, nextSunrise: 372, timezone: 'Asia/Kolkata' };
+  assert.deepEqual({ ...applySunrise(solar, '') }, { ...solar, manual: false });
+  assert.deepEqual({ ...applySunrise(solar, '06:05') }, { ...solar, sunrise: 365, manual: true });
+  assert.throws(() => applySunrise(solar, '18:00'), /before sunset/);
 });
