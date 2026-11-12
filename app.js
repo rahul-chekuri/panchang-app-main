@@ -141,18 +141,41 @@ function renderHoras(horas,periods) {
 function renderGhadiya(dayIndex,sunrise,horas,periods) {
   $('weekdayLabel').textContent=`${DAYS[dayIndex]} · Shubhakruth source table`;
   $('ghadiyaList').innerHTML=GHADIYA_ROWS.map((row,i)=>{
-    const start=sunrise+i*24,end=start+24,text=row[dayIndex],tone=classify(text),hits=intersecting(periods,start,end),hora=intersecting(horas,start,end);
-    const tags=hits.map(p=>`<span class="tag">${p.name}</span>`).join('')+
-      hora.map(h=>`<span class="tag hora-tag ${h.tone}"><span lang="te">${h.planet.name} హోర</span> / ${h.planet.en} hora</span>`).join('');
-    const badHoras=hora.filter(h=>h.tone==='bad');
-    const averageHoras=hora.filter(h=>h.tone==='average');
-    const causes=[...hits.map(p=>p.name),...badHoras.map(h=>`${h.planet.en} hora`)];
-    const effectiveTone=causes.length?'bad':tone==='good'&&averageHoras.length?'average':tone;
-    const label=causes.length?`Avoid · overlaps ${causes.join(', ')}`:
-      tone==='bad'?'Unfavorable ghadiya result':effectiveTone==='average'?'Mixed / verify':'Favorable result and hora';
+    const start=sunrise+i*24,end=start+24,text=row[dayIndex],tone=classify(text);
+    const segments=splitGhadiya(start,end,tone,horas,periods);
+    const rows=segments.map(segment=>{
+      const tags=segment.periods.map(p=>`<span class="tag">${escapeHtml(p.name)}</span>`).join('')+
+        segment.horas.map(h=>`<span class="tag hora-tag ${h.tone}"><span lang="te">${h.planet.name} హోర</span> / ${h.planet.en} hora</span>`).join('');
+      return `<div class="slot-segment ${segment.tone}"><div class="segment-time">${segmentTime(segment.start)}–${segmentTime(segment.end)}</div><div class="segment-rating">${escapeHtml(segment.label)}</div><div class="tags">${tags}</div></div>`;
+    }).join('');
     const timeLabel=`${fmt(start)}–${fmt(end)}`;
-    return `<article class="ghadiya-card ${effectiveTone}"><div class="slot-time">${timeLabel}</div><div class="slot-content"><div class="slot-result" lang="te">${escapeHtml(GHADIYA_TELUGU_ROWS[i][dayIndex])}</div><div class="slot-english">${escapeHtml(text)}</div><div class="slot-rating">${label}</div>${tags?`<div class="tags">${tags}</div>`:''}</div></article>`;
+    return `<article class="ghadiya-card"><div class="slot-time">${timeLabel}</div><div class="slot-content"><div class="slot-result" lang="te">${escapeHtml(GHADIYA_TELUGU_ROWS[i][dayIndex])}</div><div class="slot-english">${escapeHtml(text)}</div><div class="slot-segments">${rows}</div></div></article>`;
   }).join(''); $('ghadiyaSection').hidden=false;
+}
+function splitGhadiya(start,end,ghadiyaTone,horas,periods) {
+  const boundaries=[start,end];
+  for (const item of [...horas,...periods]) {
+    if(item.start>start&&item.start<end) boundaries.push(item.start);
+    if(item.end>start&&item.end<end) boundaries.push(item.end);
+  }
+  const sorted=[...new Set(boundaries)].sort((a,b)=>a-b);
+  return sorted.slice(0,-1).map((from,i)=>{
+    const to=sorted[i+1],activeHoras=intersecting(horas,from,to),activePeriods=intersecting(periods,from,to);
+    const causes=activePeriods.map(p=>p.name);
+    if(ghadiyaTone==='bad') causes.push('Unfavorable ghadiya result');
+    causes.push(...activeHoras.filter(h=>h.tone==='bad').map(h=>`${h.planet.en} hora`));
+    const mixed=ghadiyaTone==='average'||!activeHoras.length||activeHoras.some(h=>h.tone==='average');
+    const tone=causes.length?'bad':mixed?'average':'good';
+    const label=causes.length?`Avoid · ${causes.join(', ')}`:mixed?
+      `Mixed / verify · ${!activeHoras.length?'Hora unavailable':ghadiyaTone==='average'?'Uncertain ghadiya result':'Mixed hora'}`:
+      'Favorable ghadiya and hora · no avoid periods';
+    return {start:from,end:to,tone,label,horas:activeHoras,periods:activePeriods};
+  });
+}
+function segmentTime(minute) {
+  const seconds=((Math.round(minute*60)%86400)+86400)%86400;
+  const h=Math.floor(seconds/3600),m=Math.floor(seconds%3600/60),s=seconds%60;
+  return `${h%12||12}:${String(m).padStart(2,'0')}${s?`:${String(s).padStart(2,'0')}`:''} ${h<12?'AM':'PM'}`;
 }
 function escapeHtml(text) { return String(text).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 async function loadChart() {
