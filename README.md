@@ -12,9 +12,9 @@ An installable, mobile-friendly static web app that combines a chosen date and l
 - Responsive layout and installable PWA shell; the app files are cached after first visit.
 
 
-## Entering your own sunrise
+## Entering your own sunrise and sunset
 
-Use **Sunrise (optional)** to enter a sunrise time (for example from a local almanac). Every period, hora, and ghadiya is then calculated from that time; sunset and the next sunrise still come from the selected location. Tap **Auto** to return to the calculated sunrise. The entered time must be before sunset.
+Enter both **Sunrise (optional)** and **Sunset (optional)** with a date to calculate without a location or a solar-data network request. Use local clock times from your almanac; sunrise must precede sunset. Manual mode shows 12 daytime horas, all avoid periods, and all 30 ghadiya cards. Nighttime horas are omitted because the next day's sunrise is unknown; any ghadiya portion after sunset has unknown hora data and cannot be green. If only one time is entered, a location is required to calculate the missing times. Tap **Auto** to clear both fields and use location-based calculations, including nighttime horas.
 
 ## Publish on GitHub Pages
 
@@ -24,7 +24,7 @@ The `Deploy Panchangam PWA to GitHub Pages` workflow publishes the root of `main
 
 Rahu Kalam, Yamagandam, and Gulika use the standard weekday segment numbers for dividing sunrise-to-sunset into eight equal parts. Durmuhurtham uses a common weekday-based daytime muhurta index divided across 15 parts; regional panchangams can use different conventions. Planetary horas divide day and night separately into 12 equal parts. Ghadiya uses the fixed 24-minute intervals from the source table, starting at local sunrise. Results appear in Telugu alongside the user's original Romanized text (not an English translation). Telugu spellings of ambiguous source phrases should be verified. Good/bad ratings are inferred from the result text, with ambiguous phrases left neutral. Any ghadiya or hora interval overlapping Rahu Kalam, Yamagandam, Gulika Kalam, or Durmuhurtham is marked red and labeled with the overlapping period. A ghadiya card is also red if any overlapping hora is unfavorable (Sun or Saturn), even if its own result is favorable. Mixed horas (Mercury and Mars) make an otherwise favorable ghadiya amber. Green requires a favorable ghadiya result and favorable overlapping horas. Hora badges display their own rating, independently of the card. A red card can indicate a partial overlap, not necessarily an entirely inauspicious interval.
 
-Sun times are retrieved online. The interface and app shell are cached for repeat visits, but calculating another date/location requires a network connection. Place search uses OpenStreetMap Nominatim; please use it respectfully and avoid repeated rapid searches.
+Automatic sun times are retrieved online. The interface and app shell are cached for repeat visits; manual sunrise-and-sunset calculations work offline after the app has been cached. Automatic date/location calculations require a network connection. Place search uses OpenStreetMap Nominatim; please use it respectfully and avoid repeated rapid searches.
 
 ### Split ghadiya rows
 

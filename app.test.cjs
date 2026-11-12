@@ -21,7 +21,7 @@ function app(overrides = {}) {
   };
   vm.createContext(context);
   vm.runInContext(readFileSync(join(__dirname, 'app.js'), 'utf8') +
-    '\nglobalThis.app = { GHADIYA_ROWS, GHADIYA_TELUGU_ROWS, PLANETS, renderGhadiya, splitGhadiya, segmentTime, applySunrise, useMyLocation, locationErrorMessage };', context);
+    '\nglobalThis.app = { GHADIYA_ROWS, GHADIYA_TELUGU_ROWS, PLANETS, renderGhadiya, splitGhadiya, segmentTime, applySunrise, resolveSunTimes, makeHoras, loadChart, useMyLocation, locationErrorMessage };', context);
   return { ...context.app, elements };
 }
 
@@ -162,4 +162,38 @@ test('an entered sunrise replaces only the calculated sunrise and must precede s
   assert.deepEqual({ ...applySunrise(solar, '') }, { ...solar, manual: false });
   assert.deepEqual({ ...applySunrise(solar, '06:05') }, { ...solar, sunrise: 365, manual: true });
   assert.throws(() => applySunrise(solar, '18:00'), /before sunset/);
+});
+
+test('manual sunrise and sunset bypass the network even with a saved location', async () => {
+  const instance = app({ fetch() { throw new Error('Network must not be used'); } });
+  for (const place of [null, { lat: 17, lon: 78, name: 'Hyderabad' }]) {
+    const solar = await instance.resolveSunTimes('2026-11-12', place, '06:00', '17:40');
+    assert.equal(solar.sunrise, 360);
+    assert.equal(solar.sunset, 1060);
+    assert.equal(solar.nextSunrise, null);
+  }
+  await assert.rejects(instance.resolveSunTimes('2026-11-12', null, '06:00', ''), /both sunrise and sunset/);
+  await assert.rejects(instance.resolveSunTimes('2026-11-12', null, '18:00', '18:00'), /before sunset/);
+  await assert.rejects(instance.resolveSunTimes('2026-11-12', null, '25:00', '18:00'), /valid/);
+});
+
+test('manual chart renders without a location and leaves after-sunset horas unknown', async () => {
+  const instance = app({ fetch() { throw new Error('Network must not be used'); } });
+  instance.elements.get('status').classList = { toggle() {} };
+  instance.elements.get('sunriseInput').value = '06:00';
+  instance.elements.get('sunsetInput').value = '17:40';
+  await instance.loadChart();
+  assert.equal(instance.elements.get('dailySummary').hidden, false);
+  assert.match(instance.elements.get('dailySummary').innerHTML, /6:00 AM/);
+  assert.match(instance.elements.get('status').textContent, /No location or internet needed/);
+  assert.equal((instance.elements.get('horaList').innerHTML.match(/<article/g) || []).length, 12);
+  assert.equal((instance.elements.get('ghadiyaList').innerHTML.match(/<article/g) || []).length, 30);
+  const horas = instance.makeHoras(4, 360, 1060, null);
+  assert.equal(horas[11].end, 1060);
+  const segments = instance.splitGhadiya(1056, 1080, 'good', horas, []);
+  assert.equal(segments.length, 2);
+  assert.equal(segments[1].start, 1060);
+  assert.equal(segments[1].tone, 'average');
+  assert.match(segments[1].label, /Hora unavailable/);
+  assert.equal(instance.makeHoras(4, 360, 1060, 361).length, 24);
 });

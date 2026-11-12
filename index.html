@@ -21,9 +21,9 @@
     <section class="controls card" aria-label="Date and location">
       <label class="field"><span>Date</span><input id="dateInput" type="date"></label>
       <div class="field location-field"><label for="placeInput">Location</label><div class="location-row"><input id="placeInput" type="search" placeholder="Search a city or place" autocomplete="off"><button id="searchButton" class="secondary-button">Search</button></div><div id="searchResults" class="search-results" hidden></div></div>
-      <div class="field sunrise-field"><label for="sunriseInput">Sunrise (optional)</label><div class="location-row"><input id="sunriseInput" type="time"><button id="sunriseReset" type="button" class="secondary-button">Auto</button></div><small>Leave empty to use the calculated sunrise. Sunset still comes from the location.</small></div>
+      <div class="field sunrise-field"><div class="solar-row"><label for="sunriseInput">Sunrise (optional)<input id="sunriseInput" type="time"></label><label for="sunsetInput">Sunset (optional)<input id="sunsetInput" type="time"></label><button id="sunriseReset" type="button" class="secondary-button">Auto</button></div><small>Enter both times to calculate without a location or internet. Manual mode shows daytime horas only. Auto clears both times.</small></div>
       <button id="gpsButton" class="gps-button"><span aria-hidden="true">⌖</span> Use my location</button>
-      <p id="status" class="status" role="status" aria-live="polite">Search for a place or use your location to begin.</p>
+      <p id="status" class="status" role="status" aria-live="polite">Enter sunrise and sunset, or select a location to begin.</p>
       <p class="location-help">Location needs HTTPS and both browser and phone permission. If opening from another app, use Chrome or Safari instead.</p>
       <p id="updateStatus" class="update-status" role="status" aria-live="polite"></p>
     </section>
@@ -33,7 +33,7 @@
       <div id="periodList" class="period-grid"></div>
     </section>
     <section id="horaSection" class="section" hidden>
-      <div class="section-heading"><div><p class="eyebrow">12 daytime + 12 nighttime horas</p><h2>Hora / <span lang="te">హోర</span> · planetary hours</h2></div><span class="section-note">Each hora follows the local day or night length</span></div>
+      <div class="section-heading"><div><p id="horaCoverage" class="eyebrow">12 daytime + 12 nighttime horas</p><h2>Hora / <span lang="te">హోర</span> · planetary hours</h2></div><span id="horaHelp" class="section-note">Each hora follows the local day or night length</span></div>
       <div id="horaList" class="hora-grid"></div>
     </section>
     <section id="ghadiyaSection" class="section" hidden>
