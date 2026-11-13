@@ -75,6 +75,41 @@ const GOOD_WORDS = /siddhi|labham|labhamu|jaya|jayam|jayamu|vrudhi|soukhyamu|sou
 const $ = (id) => document.getElementById(id);
 const dateInput = $('dateInput'), statusEl = $('status'), resultsEl = $('searchResults');
 let place = null, installPrompt = null, chartRequest = 0;
+const loadingOperations = new Map();
+function startLoading(message) {
+  const token=Symbol(message);
+  loadingOperations.set(token,message);
+  updateLoading();
+  return ()=>{
+    loadingOperations.delete(token);
+    updateLoading();
+  };
+}
+function updateLoading() {
+  $('loadingPanel').hidden=!loadingOperations.size;
+  const messages=[...loadingOperations.values()];
+  $('loadingText').textContent=messages[messages.length-1]||'';
+}
+function dateAtPlace(date,timezone,hour=12) {
+  const target=Date.parse(`${date}T${String(hour).padStart(2,'0')}:00:00Z`);
+  const formatter=new Intl.DateTimeFormat('en-US',{timeZone:timezone,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'});
+  let instant=target;
+  for(let i=0;i<3;i++){
+    const parts=Object.fromEntries(formatter.formatToParts(new Date(instant)).map(p=>[p.type,p.value]));
+    const local=Date.parse(`${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}:${parts.second}Z`);
+    instant+=target-local;
+  }
+  return new Date(instant);
+}
+function moonPhaseForDate(date,timezone=Intl.DateTimeFormat().resolvedOptions().timeZone) {
+  const phase=SunCalc.getMoonIllumination(dateAtPlace(date,timezone)).phase;
+  return phase<0.5?'waxing':'waning';
+}
+function selectedMoonPhase(date,timezone) {
+  const phase=$('moonPhase').value||moonPhaseForDate(date,timezone);
+  $('moonPhaseHelp').textContent=$('moonPhase').value?'Using your selected Moon phase.':`Auto estimate: ${phase==='waxing'?'Waxing / శుక్ల పక్షం':'Waning / కృష్ణ పక్షం'} at noon on the selected date. Override if your almanac differs.`;
+  return phase;
+}
 
 function classify(text) {
   const normalized = text.toLowerCase().replace(/\s+/g, ' ').trim();
@@ -84,7 +119,6 @@ function classify(text) {
   return 'average';
 }
 function weekday(dateString) { return new Date(`${dateString}T12:00:00`).getDay(); }
-function toMinutes(iso) { const m = iso.match(/T(\d{2}):(\d{2})/); if (!m) throw new Error('Sunrise/sunset time was not returned in a recognizable format.'); return Number(m[1])*60+Number(m[2]); }
 function fmt(minute, withPeriod=true) {
   const normalized = ((Math.round(minute)%1440)+1440)%1440, h=Math.floor(normalized/60), m=normalized%60;
   const hour12 = h%12 || 12;
@@ -93,17 +127,24 @@ function fmt(minute, withPeriod=true) {
 function datePlus(date, offset) { const d = new Date(`${date}T12:00:00`); d.setDate(d.getDate()+offset); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
 function intersects(a,b,c,d) { return a<d && c<b; }
 function setStatus(message, error=false) { statusEl.textContent=message; statusEl.classList.toggle('error',error); }
-function setPlace(lat,lon,name) { place={lat:Number(lat),lon:Number(lon),name}; localStorage.setItem('panchang-place',JSON.stringify(place)); $('placeInput').value=name; resultsEl.hidden=true; loadChart(); }
+function setPlace(lat,lon,name) {
+  place={lat:Number(lat),lon:Number(lon),name};
+  try { localStorage.setItem('panchang-place',JSON.stringify(place)); }
+  catch(error) { console.warn('Could not remember this location.',error); }
+  $('placeInput').value=name; resultsEl.hidden=true; loadChart();
+}
 
 async function getSunTimes(date, lat, lon) {
-  const tomorrow=datePlus(date,1), todayLocal=new Date();
-  const dateIsPast = date < `${todayLocal.getFullYear()}-${String(todayLocal.getMonth()+1).padStart(2,'0')}-${String(todayLocal.getDate()).padStart(2,'0')}`;
-  const endpoint=dateIsPast?'https://archive-api.open-meteo.com/v1/archive':'https://api.open-meteo.com/v1/forecast';
-  const url=`${endpoint}?latitude=${encodeURIComponent(lat)}&longitude=${encodeURIComponent(lon)}&daily=sunrise,sunset&timezone=auto&start_date=${date}&end_date=${tomorrow}`;
-  const response=await fetch(url); if(!response.ok) throw new Error('Could not fetch sunrise and sunset for that date. Check the date and try again.');
-  const data=await response.json();
-  if(!data.daily?.sunrise?.[0]||!data.daily?.sunset?.[0]||!data.daily?.sunrise?.[1]) throw new Error('No sunrise data was returned for this date and location.');
-  return {sunrise:toMinutes(data.daily.sunrise[0]),sunset:toMinutes(data.daily.sunset[0]),nextSunrise:toMinutes(data.daily.sunrise[1]),timezone:data.timezone||'local'};
+  if(!Number.isFinite(lat)||!Number.isFinite(lon)||Math.abs(lat)>90||Math.abs(lon)>180) throw new Error('This location has invalid coordinates. Select a location again.');
+  const timezone=tzlookup(lat,lon), tomorrow=datePlus(date,1);
+  const today=SunCalc.getTimes(dateAtPlace(date,timezone),lat,lon);
+  const next=SunCalc.getTimes(dateAtPlace(tomorrow,timezone),lat,lon);
+  if([today.sunrise,today.sunset,next.sunrise].some(d=>!Number.isFinite(d.getTime()))) throw new Error('Sunrise or sunset does not occur at this location on this date. Enter both times manually or select another location.');
+  const minutes=d=>{
+    const parts=new Intl.DateTimeFormat('en-US',{timeZone:timezone,hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(d);
+    return Number(parts.find(p=>p.type==='hour').value)*60+Number(parts.find(p=>p.type==='minute').value);
+  };
+  return {sunrise:minutes(today.sunrise),sunset:minutes(today.sunset),nextSunrise:minutes(next.sunrise),timezone};
 }
 function makePeriods(dayIndex,sunrise,dayLength) {
   const eighth=dayLength/8, muhurta=dayLength/15;
@@ -221,31 +262,54 @@ async function loadChart() {
   const request=++chartRequest, selectedPlace=place;
   if(!dateInput.value){setStatus('Choose a date to calculate the chart.',true);return;}
   setStatus('Calculating your chart…');
+  const finishLoading=startLoading('Calculating sunrise, sunset, and your chart…');
   for(const id of ['dailySummary','periodSection','horaSection','ghadiyaSection']) $(id).hidden=true;
   try {
     const date=dateInput.value;
+    selectedMoonPhase(date);
     const solar=await resolveSunTimes(date,selectedPlace,$('sunriseInput').value,$('sunsetInput').value), dayIndex=weekday(date), dayLength=solar.sunset-solar.sunrise;
     if(request!==chartRequest) return;
     if(dayLength<=0||dayLength>=1440) throw new Error('Sunrise/sunset values are not valid for this location and date.');
-    const periods=makePeriods(dayIndex,solar.sunrise,dayLength), horas=makeHoras(dayIndex,solar.sunrise,solar.sunset,solar.nextSunrise,$('moonPhase').value);
+    const phase=selectedMoonPhase(date,solar.estimatedNextSunrise?undefined:solar.timezone);
+    const periods=makePeriods(dayIndex,solar.sunrise,dayLength), horas=makeHoras(dayIndex,solar.sunrise,solar.sunset,solar.nextSunrise,phase);
     const manualOnly=solar.estimatedNextSunrise;
     renderSummary(solar.sunrise,solar.sunset,solar.timezone,dayIndex,solar.manual,manualOnly?'Entered times':selectedPlace.name); renderPeriods(periods); renderHoras(horas,periods); renderGhadiya(dayIndex,solar.sunrise,solar.sunset,solar.nextSunrise,horas,periods);
     $('horaCoverage').textContent='Daytime and nighttime horas';
     $('horaHelp').textContent=manualOnly?'Tomorrow’s sunrise is estimated using today’s sunrise.':'Tomorrow’s sunrise uses the selected location.';
     setStatus(manualOnly?`Showing ${DAYS[dayIndex]} using your sunrise and sunset. Tomorrow’s sunrise is estimated as ${fmt(solar.nextSunrise)}.`:`Showing ${DAYS[dayIndex]} in ${selectedPlace.name}${solar.manual?' using your adjusted times':''}. Times are local to the selected place.`);
-  } catch(error) { if(request===chartRequest) setStatus(error.message||'Unable to calculate this chart.',true); }
+    return true;
+  } catch(error) { if(request===chartRequest) setStatus(error.message||'Unable to calculate this chart.',true); return false; }
+  finally { finishLoading(); }
 }
 async function searchPlace() {
+  if($('searchButton').disabled) return;
   const query=$('placeInput').value.trim(); if(query.length<2){setStatus('Enter at least two characters to search.',true);return;}
   setStatus('Searching places…'); resultsEl.hidden=true;
+  const finishLoading=startLoading('Searching for matching locations…');
+  $('searchButton').disabled=true;
   try {
-    const response=await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&q=${encodeURIComponent(query)}`);
+    const response=await fetchWithTimeout(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&q=${encodeURIComponent(query)}`);
     if(!response.ok) throw new Error('Place search is unavailable right now.');
     const results=await response.json(); resultsEl.replaceChildren();
+    if(!Array.isArray(results)) throw new Error('Place search returned invalid data. Try again or enter sunrise and sunset.');
     if(!results.length){setStatus('No matching places found. Try a nearby city or a more specific name.');return;}
     for(const result of results){const button=document.createElement('button');button.type='button';button.className='result-button';button.textContent=result.display_name;button.addEventListener('click',()=>setPlace(result.lat,result.lon,result.display_name.split(',').slice(0,2).join(',')));resultsEl.append(button);}
     resultsEl.hidden=false; setStatus('Select a matching place from the results.');
   } catch(error){setStatus(error.message||'Place search failed.',true);}
+  finally { finishLoading(); $('searchButton').disabled=false; }
+}
+async function fetchWithTimeout(url) {
+  const controller=new AbortController();
+  const timer=setTimeout(()=>controller.abort(),15000);
+  try {
+    const response=await fetch(url,{signal:controller.signal});
+    const data=await response.json();
+    return {ok:response.ok,json:async()=>data};
+  } catch(error) {
+    if(controller.signal.aborted) throw new Error('Place search timed out. Retry, use device location, or enter sunrise and sunset.');
+    if(error instanceof SyntaxError) throw new Error('Place search returned invalid data. Retry or enter sunrise and sunset.');
+    throw new Error('Could not reach place search. Check your connection, use device location, or enter sunrise and sunset.');
+  } finally { clearTimeout(timer); }
 }
 $('searchButton').addEventListener('click',searchPlace);
 $('placeInput').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();searchPlace();}});
@@ -257,21 +321,34 @@ function locationErrorMessage(error) {
     default: return 'Your browser could not provide a location. Check browser and device location settings or search for a city.';
   }
 }
-function useMyLocation() {
+function useMyLocation(automatic=false) {
   if(!window.isSecureContext){setStatus('Location requires HTTPS. Open the published https:// site in Chrome or Safari, not a local file or an in-app preview.',true);return;}
   if(!navigator.geolocation){setStatus('This browser does not support location access. Open the app in Chrome or Safari, or search for a city.',true);return;}
   const button=$('gpsButton');
+  if(button.disabled) return;
   button.disabled=true;
+  const finishLoading=startLoading('Finding your location. Please allow browser location access…');
+  let settled=false;
+  const finish=()=>{
+    if(settled) return false;
+    settled=true; clearTimeout(timer); button.disabled=false; finishLoading(); return true;
+  };
+  const failure=error=>{
+    if(!finish()) return;
+    const message=locationErrorMessage(error);
+    if(automatic&&place){
+      loadChart().then(success=>{if(success) setStatus(`${message} Showing the saved location: ${place.name}.`,true);});
+    } else { setStatus(`${message} You can also enter sunrise and sunset.`,true); }
+  };
+  const timer=setTimeout(()=>failure({code:3}),32000);
   setStatus('Finding your location. Allow access if prompted; this can take up to 30 seconds…');
-  navigator.geolocation.getCurrentPosition(({coords})=>{
-    button.disabled=false;
+  try { navigator.geolocation.getCurrentPosition(({coords})=>{
+    if(!finish()) return;
     setPlace(coords.latitude,coords.longitude,'Current location');
-  },error=>{
-    button.disabled=false;
-    setStatus(locationErrorMessage(error),true);
-  },{enableHighAccuracy:false,timeout:30000,maximumAge:300000});
+  },failure,{enableHighAccuracy:false,timeout:30000,maximumAge:300000}); }
+  catch(error) { failure(error); }
 }
-$('gpsButton').addEventListener('click',useMyLocation);
+$('gpsButton').addEventListener('click',()=>useMyLocation());
 dateInput.addEventListener('change',loadChart);
 $('sunriseInput').addEventListener('change',loadChart);
 $('sunsetInput').addEventListener('change',loadChart);
@@ -293,4 +370,16 @@ if('serviceWorker' in navigator) window.addEventListener('load',async()=>{
   }
 });
 const now=new Date(); dateInput.value=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
-try {const saved=JSON.parse(localStorage.getItem('panchang-place'));if(saved?.lat&&saved?.lon){place=saved;$('placeInput').value=saved.name;loadChart();}} catch { localStorage.removeItem('panchang-place'); }
+function initializeLocation() {
+  selectedMoonPhase(dateInput.value);
+  try {
+    const saved=JSON.parse(localStorage.getItem('panchang-place'));
+    if(saved&&Number.isFinite(saved.lat)&&Number.isFinite(saved.lon)&&typeof saved.name==='string'){
+      place=saved; $('placeInput').value=saved.name;
+    }
+  } catch(error) { console.warn('Could not restore the saved location.',error); }
+  if(window.isSecureContext&&navigator.geolocation) useMyLocation(true);
+  else if(place) loadChart();
+  else setStatus('Automatic location is unavailable. Search for a city or enter sunrise and sunset.',true);
+}
+window.addEventListener('DOMContentLoaded',initializeLocation);

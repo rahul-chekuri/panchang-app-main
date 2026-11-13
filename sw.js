@@ -1,6 +1,6 @@
 const CACHE_PREFIX='panchang-app-';
-const CACHE=`${CACHE_PREFIX}v6-${encodeURIComponent(self.registration.scope)}`;
-const CORE=['./','./index.html','./styles.css','./app.js','./manifest.webmanifest','./icon.svg'];
+const CACHE=`${CACHE_PREFIX}v7-${encodeURIComponent(self.registration.scope)}`;
+const CORE=['./','./index.html','./styles.css','./vendor/suncalc.js','./vendor/tz-lookup.js','./app.js','./manifest.webmanifest','./icon.svg'];
 const CORE_URLS=new Set(CORE.map(path=>new URL(path,self.registration.scope).href));
 
 self.addEventListener('install',event=>event.waitUntil((async()=>{

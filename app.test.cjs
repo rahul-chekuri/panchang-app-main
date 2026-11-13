@@ -16,12 +16,15 @@ function app(overrides = {}) {
     window: { addEventListener() {} },
     navigator: {},
     localStorage: { getItem() { return null; }, setItem() {} },
+    SunCalc: require('./vendor/suncalc.js'),
+    tzlookup: require('./vendor/tz-lookup.js'),
+    Intl, console, setTimeout, clearTimeout, AbortController,
     Date,
     ...overrides
   };
   vm.createContext(context);
   vm.runInContext(readFileSync(join(__dirname, 'app.js'), 'utf8') +
-    '\nglobalThis.app = { GHADIYA_ROWS, GHADIYA_TELUGU_ROWS, PLANETS, renderGhadiya, splitGhadiya, segmentTime, applySunrise, resolveSunTimes, makeHoras, loadChart, useMyLocation, locationErrorMessage };', context);
+    '\nglobalThis.app = { GHADIYA_ROWS, GHADIYA_TELUGU_ROWS, PLANETS, renderGhadiya, splitGhadiya, segmentTime, applySunrise, resolveSunTimes, makeHoras, loadChart, useMyLocation, locationErrorMessage, initializeLocation, getSunTimes, dateAtPlace, moonPhaseForDate, startLoading, fetchWithTimeout };', context);
   return { ...context.app, elements };
 }
 
@@ -232,4 +235,121 @@ test('ghadiya cycles restart at sunset, repeat after 30 rows, and stop at next s
   assert.ok(cards[31].includes('Night · 6:20 PM–6:44 PM'));
   assert.ok(cards[31].includes(instance.GHADIYA_ROWS[0][0]));
   assert.ok(cards.at(-1).includes('6:10 AM (+1 day)'));
+});
+
+test('today is selected and startup requests device location rather than using a saved place by default', async () => {
+  let success;
+  const instance = app({
+    window: { isSecureContext: true, addEventListener() {} },
+    navigator: { geolocation: { getCurrentPosition(ok) { success = ok; } } },
+    localStorage: { getItem() { return '{"lat":0,"lon":0,"name":"Saved place"}'; }, setItem() {} }
+  });
+  const now = new Date();
+  assert.equal(instance.elements.get('dateInput').value,
+    `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`);
+  instance.elements.get('status').classList = { toggle() {} };
+  instance.initializeLocation();
+  assert.equal(typeof success, 'function');
+  assert.equal(instance.elements.get('loadingPanel').hidden, false);
+  success({ coords: { latitude: 17.385, longitude: 78.4867 } });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(instance.elements.get('placeInput').value, 'Current location');
+  assert.equal(instance.elements.get('dailySummary').hidden, false);
+  assert.equal(instance.elements.get('loadingPanel').hidden, true);
+});
+
+test('denied automatic location explicitly falls back to a valid saved place including zero coordinates', async () => {
+  let failure;
+  const instance = app({
+    window: { isSecureContext: true, addEventListener() {} },
+    navigator: { geolocation: { getCurrentPosition(ok, fail) { failure = fail; } } },
+    localStorage: { getItem() { return '{"lat":0,"lon":0,"name":"Saved place"}'; }, setItem() {} }
+  });
+  instance.elements.get('status').classList = { toggle() {} };
+  instance.initializeLocation();
+  failure({ code: 1 });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(instance.elements.get('dailySummary').hidden, false);
+  assert.match(instance.elements.get('status').textContent, /permission is blocked.*Showing the saved location/);
+  assert.equal(instance.elements.get('loadingPanel').hidden, true);
+});
+
+test('solar calculations do not fetch and use the selected place timezone across the date line', async () => {
+  const instance = app({ fetch() { throw new Error('No network permitted'); } });
+  for (const [lat,lon,zone] of [[17.385,78.4867,'Asia/Kolkata'],[40.71,-74,'America/New_York'],[-36.85,174.76,'Pacific/Auckland']]) {
+    const solar = await instance.getSunTimes('2026-11-13', lat, lon);
+    assert.equal(solar.timezone, zone);
+    assert.ok(solar.sunrise >= 300 && solar.sunrise < 480);
+    assert.ok(solar.sunset > solar.sunrise);
+    const day = new Intl.DateTimeFormat('en-CA', { timeZone: zone, year:'numeric',month:'2-digit',day:'2-digit' })
+      .format(instance.dateAtPlace('2026-11-13', zone));
+    assert.equal(day, '2026-11-13');
+  }
+  await assert.rejects(instance.getSunTimes('2026-06-21', 89, 0), /does not occur/);
+});
+
+test('automatic Moon phase follows the selected date and manual selection overrides it', async () => {
+  const instance = app();
+  assert.equal(instance.moonPhaseForDate('2024-04-15', 'UTC'), 'waxing');
+  assert.equal(instance.moonPhaseForDate('2024-04-30', 'UTC'), 'waning');
+  instance.elements.get('status').classList = { toggle() {} };
+  instance.elements.get('sunriseInput').value = '06:00';
+  instance.elements.get('sunsetInput').value = '18:00';
+  instance.elements.get('dateInput').value = '2024-04-15';
+  await instance.loadChart();
+  assert.match(instance.elements.get('moonPhaseHelp').textContent, /Auto estimate: Waxing/);
+  const moon = html => html.split('<article').find(card => card.includes('<span>Moon</span>'));
+  assert.match(moon(instance.elements.get('horaList').innerHTML), /hora-card good/);
+  instance.elements.get('moonPhase').value = 'waning';
+  await instance.loadChart();
+  assert.match(moon(instance.elements.get('horaList').innerHTML), /hora-card bad/);
+});
+
+test('loading remains visible for concurrent work and clears after chart validation failures', async () => {
+  const instance = app();
+  const done1 = instance.startLoading('Location');
+  const done2 = instance.startLoading('Chart');
+  done1();
+  assert.equal(instance.elements.get('loadingPanel').hidden, false);
+  done2();
+  assert.equal(instance.elements.get('loadingPanel').hidden, true);
+  instance.elements.get('status').classList = { toggle() {} };
+  instance.elements.get('sunriseInput').value = '18:00';
+  instance.elements.get('sunsetInput').value = '06:00';
+  await instance.loadChart();
+  assert.equal(instance.elements.get('loadingPanel').hidden, true);
+  assert.match(instance.elements.get('status').textContent, /before sunset/);
+});
+
+test('place search has a bounded timeout instead of hanging indefinitely', async () => {
+  let abort;
+  const instance = app({
+    setTimeout(callback) { abort = callback; return 1; },
+    clearTimeout() {},
+    fetch(url, options) {
+      return new Promise((resolve, reject) => options.signal.addEventListener('abort', () => reject(new Error('aborted'))));
+    }
+  });
+
+  const search = instance.fetchWithTimeout('https://example.com/search');
+  abort();
+  await assert.rejects(search, /timed out/);
+});
+
+test('GPS safety cutoff clears loading and ignores a late result', () => {
+  let cutoff, success;
+  const instance = app({
+    window: { isSecureContext: true, addEventListener() {} },
+    navigator: { geolocation: { getCurrentPosition(ok) { success = ok; } } },
+    setTimeout(callback) { cutoff = callback; return 1; },
+    clearTimeout() {}
+  });
+  instance.elements.get('status').classList = { toggle() {} };
+  instance.useMyLocation();
+  cutoff();
+  assert.equal(instance.elements.get('gpsButton').disabled, false);
+  assert.equal(instance.elements.get('loadingPanel').hidden, true);
+  assert.match(instance.elements.get('status').textContent, /timed out/);
+  success({ coords: { latitude: 17, longitude: 78 } });
+  assert.equal(instance.elements.get('placeInput').value, '');
 });

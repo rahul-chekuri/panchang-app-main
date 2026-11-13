@@ -4,8 +4,10 @@ An installable, mobile-friendly static web app that combines a chosen date and l
 
 ## Features
 
-- Search a place with OpenStreetMap or use device location.
-- Fetches local sunrise and sunset for the selected date from Open-Meteo.
+- Opens with today's date and requests current device location (browser permission is required).
+- Searches places with OpenStreetMap; if automatic location fails, a valid saved location is used with an explicit warning.
+- Calculates sunrise, sunset, and Moon phase locally, without an external solar-data service.
+- Shows a non-blocking loading popup during location lookup, place search, and chart calculation.
 - Shows Rahu Kalam, Yamagandam, Gulika Kalam, and a weekday Durmuhurtham window.
 - Computes one-hour planetary horas across daytime and nighttime, restarting at sunset and shortening boundary intervals.
 - Repeats the 30-row ghadiya table during each day and night cycle and highlights overlapping periods.
@@ -16,7 +18,7 @@ An installable, mobile-friendly static web app that combines a chosen date and l
 
 Enter both **Sunrise (optional)** and **Sunset (optional)** with a date to calculate without a location or a solar-data network request. Use local clock times from your almanac; sunrise must precede sunset. In manual mode the next day's sunrise is estimated as today's entered sunrise, which may differ from the actual time. If only one time is entered, a location is required to calculate the missing times. Tap **Auto** to clear both fields and use location-based calculations, including the next day's sunrise.
 
-Select waxing or waning Moon from your almanac. Moon horas are favorable during waxing and unfavorable during waning; without a selection they are marked mixed rather than assumed favorable. The selected phase applies to the whole displayed interval, so update it if the phase changes during the interval.
+Moon phase defaults to **Auto**, estimated with SunCalc at noon on the selected date in the selected location's timezone. With manually entered solar times, the device timezone is used. Moon horas are favorable during waxing and unfavorable during waning. You can override the estimate using your almanac. This is an astronomical estimate, not an exact tithi/paksha transition calculation; the one selected phase applies to the whole displayed interval, including the night. Review the override near new/full Moon or if the phase changes during the interval.
 
 ## Publish on GitHub Pages
 
@@ -28,9 +30,11 @@ Rahu Kalam, Yamagandam, and Gulika use the standard weekday segment numbers for 
 
 Ghadiya uses fixed 24-minute intervals, restarting the selected weekday's 30-row table at sunset, as requested. If either cycle exceeds 12 hours the same table repeats from its first row; the last slot is shortened at sunset or next sunrise. The selected weekday is retained after midnight. This nighttime repetition is an app convention, not a separate supplied nighttime source table. Times after midnight are marked `+1 day`.
 
-Results appear in Telugu alongside the user's original Romanized text (not an English translation). Telugu spellings of ambiguous source phrases should be verified. Good/bad ratings are inferred from the result text, with ambiguous phrases left neutral. A ghadiya row is red if it overlaps an avoid period or unfavorable hora, or has an unfavorable result. Mixed horas (Mercury and Mars) or an unspecified Moon phase make an otherwise favorable row amber. Green requires a favorable ghadiya result and favorable overlapping hora. Hora badges display their own rating independently of avoid periods.
+Results appear in Telugu alongside the user's original Romanized text (not an English translation). Telugu spellings of ambiguous source phrases should be verified. Good/bad ratings are inferred from the result text, with ambiguous phrases left neutral. A ghadiya row is red if it overlaps an avoid period or unfavorable hora, or has an unfavorable result. Mixed horas (Mercury and Mars) make an otherwise favorable row amber. Green requires a favorable ghadiya result and favorable overlapping hora. Hora badges display their own rating independently of avoid periods.
 
-Automatic sun times are retrieved online. The interface and app shell are cached for repeat visits; manual sunrise-and-sunset calculations work offline after the app has been cached. Automatic date/location calculations require a network connection. Place search uses OpenStreetMap Nominatim; please use it respectfully and avoid repeated rapid searches.
+Solar times are calculated locally with SunCalc, using tz-lookup for the coordinates' timezone and the browser's timezone database for DST. These are estimates; timezone lookup can be approximate near borders, and local terrain/horizon effects are not included. Check your local almanac if precise times are needed. Polar dates without sunrise or sunset show an explicit error rather than invented times. Both libraries are bundled and cached for offline chart calculations after the first successful visit; device location availability still depends on the browser/device. Place search uses OpenStreetMap Nominatim and needs internet access; requests time out after 15 seconds. Please use it respectfully and avoid repeated rapid searches.
+
+Bundled libraries: `vendor/suncalc.js` (SunCalc 1.9.0, BSD-2-Clause; see `vendor/suncalc.LICENSE`) and `vendor/tz-lookup.js` (tz-lookup 6.1.25, CC0; see `vendor/tz-lookup.LICENSE`). Keep the entire `vendor/` folder when deploying.
 
 ### Split ghadiya rows
 
@@ -44,6 +48,6 @@ The service worker now requests current app files from the network without using
 
 On the first upgrade from the old cache-first worker, open the site online and refresh it once. If a browser still shows the old version, close all app tabs and reopen it; as a one-time recovery, clear this site's stored data in the browser settings (this also removes the saved location). Do not clear all browsing data.
 
-Location requires the HTTPS site, permission for the site, and enabled device/browser Location Services. Open the link in Chrome or Safari rather than an embedded in-app browser. Permission denial, unavailable position and timeouts now show distinct recovery messages. The request allows 30 seconds and accepts a device location up to five minutes old; it does not bypass permission or substitute an IP-based location. Android users should check the site's Location permission and the browser's permission in phone Settings; iPhone users should check Settings → Privacy & Security → Location Services and the browser's location access. City search remains available if the device cannot return a position.
+Location requires the HTTPS site, permission for the site, and enabled device/browser Location Services. Open the link in Chrome or Safari rather than an embedded in-app browser. Permission denial, unavailable position and timeouts show distinct recovery messages. The request allows 30 seconds, has a 32-second safety cutoff, and accepts a device location up to five minutes old; it does not bypass permission or substitute an IP-based location. Android users should check the site's Location permission and the browser's permission in phone Settings; iPhone users should check Settings → Privacy & Security → Location Services and the browser's location access. City search and manual sunrise/sunset remain available if the device cannot return a position.
 
 Run all focused checks with `node --test app.test.cjs sw.test.cjs`.
