@@ -467,6 +467,23 @@ test('before-sunrise summary uses the previous weekday night cycle without gaps 
   assert.ok(combined.some(w=>w.start>=360));
 });
 
+test('continuous good windows retain exact ghadiya and hora changes in their details', () => {
+  const instance = app();
+  const venus = instance.PLANETS[1], jupiter = instance.PLANETS[5];
+  const windows = instance.goodWindows([{
+    dayIndex:0,shift:0,solar:{sunrise:360,sunset:1080,nextSunrise:360},periods:[],
+    horas:[{start:360,end:390,tone:'good',planet:venus},
+      {start:390,end:420,tone:'good',planet:jupiter}]
+  }],370,400);
+  assert.equal(windows.length,1);
+  assert.deepEqual(Array.from(windows[0].details,d=>[d.start,d.end,d.ghadiya,d.planets[0].en]),[
+    [370,384,instance.GHADIYA_ROWS[0][0],'Venus'],
+    [384,390,instance.GHADIYA_ROWS[1][0],'Venus'],
+    [390,400,instance.GHADIYA_ROWS[1][0],'Jupiter']
+  ]);
+  assert.equal(windows[0].details[0].telugu,instance.GHADIYA_TELUGU_ROWS[0][0]);
+});
+
 test('loading a manual chart adds a good-time summary and preserves the detailed charts', async () => {
   const instance = app();
   instance.elements.get('status').classList = { toggle() {} };
@@ -475,6 +492,9 @@ test('loading a manual chart adds a good-time summary and preserves the detailed
   instance.elements.get('sunsetInput').value = '18:00';
   await instance.loadChart();
   assert.equal(instance.elements.get('goodTimesSection').hidden,false);
+  assert.match(instance.elements.get('goodTimesList').innerHTML,/Ghadiya/);
+  assert.match(instance.elements.get('goodTimesList').innerHTML,/Hora/);
+  assert.match(instance.elements.get('goodTimesList').innerHTML,/good-window-detail/);
   assert.match(instance.elements.get('goodTimesNote').textContent,/Previous solar times are estimated/);
   for (const id of ['periodSection','horaSection','ghadiyaSection']) {
     assert.equal(instance.elements.get(id).hidden,false);

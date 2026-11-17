@@ -302,20 +302,26 @@ function goodWindows(cycles,from=240,to=1320) {
       const tone=classify(GHADIYA_ROWS[slot.row][dayIndex]);
       for(const segment of splitGhadiya(slot.start,slot.end,tone,horas,periods)){
         const start=Math.max(from,segment.start+shift),end=Math.min(to,segment.end+shift);
-        if(segment.tone==='good'&&end>start) green.push({start,end});
+        if(segment.tone==='good'&&end>start) green.push({
+          start,end,ghadiya:GHADIYA_ROWS[slot.row][dayIndex],
+          telugu:GHADIYA_TELUGU_ROWS[slot.row][dayIndex],
+          planets:segment.horas.map(h=>h.planet)
+        });
       }
     }
   }
   const merged=[];
   for(const window of green.sort((a,b)=>a.start-b.start)){
     const last=merged[merged.length-1];
-    if(last&&window.start<=last.end) last.end=Math.max(last.end,window.end);
-    else merged.push({...window});
+    if(last&&window.start<=last.end){
+      last.end=Math.max(last.end,window.end);
+      last.details.push(window);
+    } else merged.push({start:window.start,end:window.end,details:[window]});
   }
   return merged;
 }
 function renderGoodWindows(windows,note) {
-  $('goodTimesList').innerHTML=windows.length?windows.map(w=>`<div class="good-window">${segmentTime(w.start)}–${segmentTime(w.end)}</div>`).join(''):'<p class="section-copy">No green time windows meet all chart rules between 4 AM and 10 PM.</p>';
+  $('goodTimesList').innerHTML=windows.length?windows.map(w=>`<article class="good-window"><strong>${segmentTime(w.start)}–${segmentTime(w.end)}</strong>${w.details.map(d=>`<div class="good-window-detail"><div class="good-detail-time">${segmentTime(d.start)}–${segmentTime(d.end)}</div><div>Ghadiya / <span lang="te">ఘడియ</span>: <span lang="te">${escapeHtml(d.telugu)}</span> / ${escapeHtml(d.ghadiya)}</div><div>Hora / <span lang="te">హోర</span>: ${d.planets.map(p=>`<span lang="te">${escapeHtml(p.name)}</span> / ${escapeHtml(p.en)}`).join(', ')}</div></div>`).join('')}</article>`).join(''):'<p class="section-copy">No green time windows meet all chart rules between 4 AM and 10 PM.</p>';
   $('goodTimesNote').textContent=note;
   $('goodTimesSection').hidden=false;
 }
