@@ -17,14 +17,15 @@ function app(overrides = {}) {
     navigator: {},
     localStorage: { getItem() { return null; }, setItem() {} },
     SunCalc: require('./vendor/suncalc.js'),
+    Astronomy: require('./vendor/astronomy-engine.js'),
     tzlookup: require('./vendor/tz-lookup.js'),
-    Intl, console, setTimeout, clearTimeout, AbortController,
+    Intl, RangeError, console, setTimeout, clearTimeout, AbortController,
     Date,
     ...overrides
   };
   vm.createContext(context);
   vm.runInContext(readFileSync(join(__dirname, 'app.js'), 'utf8') +
-    '\nglobalThis.app = { GHADIYA_ROWS, GHADIYA_TELUGU_ROWS, PLANETS, renderGhadiya, splitGhadiya, segmentTime, applySunrise, resolveSunTimes, makeHoras, loadChart, useMyLocation, locationErrorMessage, initializeLocation, getSunTimes, dateAtPlace, moonPhaseForDate, startLoading, fetchWithTimeout };', context);
+    '\nglobalThis.app = { GHADIYA_ROWS, GHADIYA_TELUGU_ROWS, PLANETS, renderGhadiya, splitGhadiya, segmentTime, applySunrise, resolveSunTimes, makeHoras, loadChart, useMyLocation, locationErrorMessage, initializeLocation, getSunTimes, dateAtPlace, moonPhaseForDate, startLoading, fetchWithTimeout, makePeriods, makeVarjyam, siderealMoonLongitude };', context);
   return { ...context.app, elements };
 }
 
@@ -352,4 +353,81 @@ test('GPS safety cutoff clears loading and ignores a late result', () => {
   assert.match(instance.elements.get('status').textContent, /timed out/);
   success({ coords: { latitude: 17, longitude: 78 } });
   assert.equal(instance.elements.get('placeInput').value, '');
+});
+
+test('all weekday Durmuhurtham windows are included, with Tuesday night and consecutive Saturday windows', () => {
+  const { makePeriods } = app();
+  const expected = [
+    [[984,1032]], [[744,792],[888,936]], [[504,552],[1368,1416]],
+    [[696,744]], [[600,648],[888,936]], [[504,552],[744,792]],
+    [[360,408],[408,456]]
+  ];
+  for (let day = 0; day < 7; day++) {
+    const windows = makePeriods(day,360,720,360).filter(p => p.name === 'Durmuhurtham');
+    assert.deepEqual(Array.from(windows, p => [p.start,p.end]), expected[day]);
+  }
+  const night = makePeriods(2,370,692,371).find(p => p.detail.startsWith('Night'));
+  assert.ok(Math.abs(night.start - (1062 + 749 * 6 / 15)) < 1e-8);
+  assert.ok(Math.abs(night.end - (1062 + 749 * 7 / 15)) < 1e-8);
+});
+
+test('Varjyam agrees with independent Swiss Ephemeris Lahiri fixtures within three minutes', () => {
+  const { makeVarjyam } = app();
+  // Swiss Ephemeris 2.10.03 (Moshier, Lahiri), solved nakshatra entry/exit;
+  // each offset and the 4-ghati duration are scaled by the actual nakshatra span.
+  const cases = [
+    ['1900-01-01','Asia/Kolkata',[[570.4667,660.3333],[1189.1833,1277.3333]]],
+    ['2026-11-12','America/New_York',[[768.6833,876.5667],[1739.5833,1800]]],
+    ['2026-11-15','Asia/Kolkata',[[360,434.4],[1677.1167,1784.3167]]],
+    ['2026-11-16','Asia/Kolkata',[]],
+    ['2026-11-17','Asia/Kolkata',[[400.1167,505.3]]],
+    ['2026-11-17','Pacific/Auckland',[[850.1167,955.3]]],
+    ['2026-11-22','America/Los_Angeles',[[662.4333,751.8167],[1408.4667,1495.5667]]],
+    ['2100-01-01','Asia/Kolkata',[[906.4167,997.6]]]
+  ];
+  for (const [date,zone,expected] of cases) {
+    const actual = makeVarjyam(date,zone,360,360);
+    assert.equal(actual.length,expected.length,`${date} ${zone}`);
+    actual.forEach((window,i) => {
+      assert.ok(Math.abs(window.start-expected[i][0])<3,`${date} ${zone} start`);
+      assert.ok(Math.abs(window.end-expected[i][1])<3,`${date} ${zone} end`);
+      assert.ok(window.start>=360 && window.end<=1800 && window.end>window.start);
+    });
+  }
+  const mula = makeVarjyam('2026-11-12','America/New_York',360,360);
+  assert.ok(mula.every(p => p.detail.startsWith('Mula')));
+});
+
+test('Varjyam splits otherwise good rows at its boundaries and combines active causes', () => {
+  const { splitGhadiya } = app();
+  const horas = [{start:540,end:600,tone:'good',planet:{en:'Venus'}}];
+  const periods = [
+    {name:'Varjyam',start:550,end:560},
+    {name:'Durmuhurtham',start:555,end:565}
+  ];
+  const segments = splitGhadiya(540,570,'good',horas,periods);
+  assert.deepEqual(Array.from(segments,s => [s.start,s.end,s.tone]),[
+    [540,550,'good'],[550,555,'bad'],[555,560,'bad'],[560,565,'bad'],[565,570,'good']
+  ]);
+  assert.match(segments[2].label,/Varjyam, Durmuhurtham/);
+});
+
+test('manual Varjyam uses the explicit timezone and rejects invalid input without hanging', async () => {
+  const instance = app();
+  assert.equal(instance.elements.get('manualTimezone').value,'Asia/Kolkata');
+  instance.elements.get('status').classList = { toggle() {} };
+  instance.elements.get('dateInput').value = '2026-11-17';
+  instance.elements.get('sunriseInput').value = '06:00';
+  instance.elements.get('sunsetInput').value = '18:00';
+  instance.elements.get('manualTimezone').value = 'Asia/Kolkata';
+  await instance.loadChart();
+  assert.match(instance.elements.get('periodList').innerHTML,/Varjyam/);
+  assert.match(instance.elements.get('varjyamHelp').textContent,/Asia\/Kolkata/);
+  instance.elements.get('manualTimezone').value = 'Not/A_Timezone';
+  await instance.loadChart();
+  assert.match(instance.elements.get('status').textContent,/valid timezone/);
+  assert.equal(instance.elements.get('loadingPanel').hidden,true);
+  assert.equal(instance.elements.get('periodSection').hidden,true);
+  assert.throws(() => instance.makeVarjyam('1800-01-01','UTC',360,360),/1900 to 2100/);
+  assert.throws(() => instance.makeVarjyam('2026-03-07','America/New_York',360,360),/clock change/);
 });

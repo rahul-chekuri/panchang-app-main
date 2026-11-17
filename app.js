@@ -69,7 +69,9 @@ const PLANETS = [
 ];
 const WEEKDAY_START = [0,3,6,2,5,1,4];
 const RAHU = [8,2,7,5,6,4,3], YAMA = [5,4,3,2,1,7,6], GULIKA = [7,6,5,4,3,2,1];
-const DURMUHURTA = [14,9,4,8,6,4,1];
+const DURMUHURTA = [[14],[9,12],[4],[8],[6,12],[4,9],[1,2]];
+const NAKSHATRAS = ['Ashwini','Bharani','Krittika','Rohini','Mrigashira','Ardra','Punarvasu','Pushya','Ashlesha','Magha','Purva Phalguni','Uttara Phalguni','Hasta','Chitra','Swati','Vishakha','Anuradha','Jyeshtha','Mula','Purva Ashadha','Uttara Ashadha','Shravana','Dhanishtha','Shatabhisha','Purva Bhadrapada','Uttara Bhadrapada','Revati'];
+const VARJYAM_OFFSETS = [[50],[24],[30],[40],[14],[21],[30],[20],[32],[30],[20],[18],[21],[20],[14],[14],[10],[14],[20,56],[24],[20],[10],[10],[18],[16],[24],[30]];
 const BAD_WORDS = /hani|nasht|nasana|bhay|badha|bhadha|kast|kashta|dukh|dhuk|kshobha|bhang|anarogyam|roga peeda|roga bhadha|jwara|kalaha|kalah|vivadhamu|chora|apajayam|mruthyu|visha|bandhanam|chikkulu|klesha|peeda|pramadh|bhrams|nasam|upadravam|ommu aguta|manasthapam|kopa theevratha|dhurvarthalu|sathru vrudhi|chanchalyam|sthana nasam|sukhanasanamu/i;
 const GOOD_WORDS = /siddhi|labham|labhamu|jaya|jayam|jayamu|vrudhi|soukhyamu|soukhy|kshemam|arogyam|santhosham|prapthi|subham|subhani|pujyatha|anugraham|sanmanam|priya bhojanam|paropakaramu|dhairyam|dharshanam|anukulam|yogam|gnana|vidya|yathra subham|ishta siddhi|prayatna phalam|vasthra labham|dhana dhanya vrudhi|vasthu vahana prapthi|priya varthalu|vahanayogam|mithra/i;
 const $ = (id) => document.getElementById(id);
@@ -90,8 +92,8 @@ function updateLoading() {
   const messages=[...loadingOperations.values()];
   $('loadingText').textContent=messages[messages.length-1]||'';
 }
-function dateAtPlace(date,timezone,hour=12) {
-  const target=Date.parse(`${date}T${String(hour).padStart(2,'0')}:00:00Z`);
+function dateAtPlace(date,timezone,hour=12,minute=0) {
+  const target=Date.parse(`${date}T00:00:00Z`)+(hour*60+minute)*60000;
   const formatter=new Intl.DateTimeFormat('en-US',{timeZone:timezone,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'});
   let instant=target;
   for(let i=0;i<3;i++){
@@ -146,11 +148,71 @@ async function getSunTimes(date, lat, lon) {
   };
   return {sunrise:minutes(today.sunrise),sunset:minutes(today.sunset),nextSunrise:minutes(next.sunrise),timezone};
 }
-function makePeriods(dayIndex,sunrise,dayLength) {
+function makePeriods(dayIndex,sunrise,dayLength,nextSunrise) {
   const eighth=dayLength/8, muhurta=dayLength/15;
   const slots=[['Rahu Kalam',RAHU[dayIndex]],['Yamagandam',YAMA[dayIndex]],['Gulika Kalam',GULIKA[dayIndex]]].map(([name,n])=>({name,start:sunrise+(n-1)*eighth,end:sunrise+n*eighth,detail:`Daylight part ${n} of 8`}));
-  const n=DURMUHURTA[dayIndex]; slots.push({name:'Durmuhurtham',start:sunrise+(n-1)*muhurta,end:sunrise+n*muhurta,detail:`Daylight muhurta ${n} of 15`});
+  for(const n of DURMUHURTA[dayIndex]) slots.push({name:'Durmuhurtham',start:sunrise+(n-1)*muhurta,end:sunrise+n*muhurta,detail:`Daylight muhurta ${n} of 15`});
+  if(dayIndex===2){
+    const sunset=sunrise+dayLength, nightMuhurta=(nextSunrise+1440-sunset)/15;
+    slots.push({name:'Durmuhurtham',start:sunset+6*nightMuhurta,end:sunset+7*nightMuhurta,detail:'Night muhurta 7 of 15'});
+  }
   return slots;
+}
+function siderealMoonLongitude(date) {
+  const time=Astronomy.MakeTime(date), t=time.tt/36525;
+  // Lahiri mean ayanamsa at J2000, advanced with IAU 2006 precession.
+  const precession=(5028.796195*t+1.1054348*t*t+0.00007964*t**3-0.000023857*t**4-0.0000000383*t**5)/3600;
+  const ayanamsa=23.857092353708822+precession+Astronomy.e_tilt(time).dpsi/3600;
+  return (Astronomy.EclipticGeoMoon(time).lon-ayanamsa+360)%360;
+}
+function nakshatraSpans(start,end) {
+  const step=6*3600000, width=360/27, crossings=[];
+  let left=start-48*3600000, longitude=siderealMoonLongitude(new Date(left));
+  for(let right=left+step;right<=end+48*3600000+step;right+=step){
+    const next=siderealMoonLongitude(new Date(right));
+    const motion=(next-longitude+360)%360;
+    const boundary=(Math.floor(longitude/width)+1)*width;
+    if(longitude+motion>=boundary){
+      let low=left, high=right;
+      while(high-low>500){
+        const mid=(low+high)/2, delta=(siderealMoonLongitude(new Date(mid))-longitude+360)%360;
+        if(longitude+delta<boundary) low=mid; else high=mid;
+      }
+      crossings.push({time:(low+high)/2,index:Math.round(boundary/width)%27});
+    }
+    left=right; longitude=next;
+  }
+  return crossings.slice(0,-1).map((entry,i)=>({index:entry.index,start:entry.time,end:crossings[i+1].time}));
+}
+function chartMinuteAt(instant,date,timezone) {
+  const parts=Object.fromEntries(new Intl.DateTimeFormat('en-US',{timeZone:timezone,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'}).formatToParts(new Date(instant)).map(p=>[p.type,p.value]));
+  const days=(Date.parse(`${parts.year}-${parts.month}-${parts.day}T00:00:00Z`)-Date.parse(`${date}T00:00:00Z`))/86400000;
+  return days*1440+Number(parts.hour)*60+Number(parts.minute)+Number(parts.second)/60;
+}
+function makeVarjyam(date,timezone,sunrise,nextSunrise) {
+  const year=Number(date.slice(0,4));
+  if(year<1900||year>2100) throw new Error('Automatic Varjyam is supported for dates from 1900 to 2100.');
+  try { new Intl.DateTimeFormat('en-US',{timeZone:timezone}); }
+  catch(error) {
+    if(error instanceof RangeError) throw new Error('Enter a valid timezone for your manual times, for example Asia/Kolkata.');
+    throw error;
+  }
+  const start=dateAtPlace(date,timezone,0,sunrise).getTime();
+  const end=dateAtPlace(datePlus(date,1),timezone,0,nextSunrise).getTime();
+  if(Math.abs((end-start)/60000-(nextSunrise+1440-sunrise))>1) throw new Error('This chart includes a timezone clock change. Check these timings in your local Panchangam; clock-change charts are not supported.');
+  const periods=[];
+  for(const span of nakshatraSpans(start,end)){
+    const unit=(span.end-span.start)/60;
+    for(const offset of VARJYAM_OFFSETS[span.index]){
+      const from=span.start+offset*unit, to=from+4*unit;
+      if(from>=end||to<=start) continue;
+      const windowStart=Math.max(sunrise,chartMinuteAt(Math.max(start,from),date,timezone));
+      const windowEnd=Math.min(nextSunrise+1440,chartMinuteAt(Math.min(end,to),date,timezone));
+      if(windowEnd<=windowStart) throw new Error('This chart crosses a clock change that cannot be represented safely. Check Varjyam in your local Panchangam.');
+      periods.push({name:'Varjyam',start:windowStart,end:windowEnd,detail:`${NAKSHATRAS[span.index]} · Lahiri estimate${from<start||to>end?' · clipped to chart range':''}`});
+    }
+  }
+  return periods.sort((a,b)=>a.start-b.start);
 }
 function makeHoras(dayIndex,sunrise,sunset,nextSunrise,moonPhase) {
   const horas=[];
@@ -197,7 +259,7 @@ function renderSummary(sunrise,sunset,timezone,dayIndex,manual=false,placeName='
 }
 function renderPeriods(periods) {
   $('periodCount').textContent=`${periods.length} daily windows`;
-  $('periodList').innerHTML=periods.map(p=>`<article class="period-card"><div class="period-name">${p.name}</div><div class="period-time">${fmt(p.start)} – ${fmt(p.end)}</div><div class="period-detail">${p.detail}</div></article>`).join('');
+  $('periodList').innerHTML=periods.map(p=>`<article class="period-card"><div class="period-name">${p.name}</div><div class="period-time">${chartTime(p.start)} – ${chartTime(p.end)}</div><div class="period-detail">${p.detail}</div></article>`).join('');
   $('periodSection').hidden=false;
 }
 function renderHoras(horas,periods) {
@@ -270,12 +332,15 @@ async function loadChart() {
     const solar=await resolveSunTimes(date,selectedPlace,$('sunriseInput').value,$('sunsetInput').value), dayIndex=weekday(date), dayLength=solar.sunset-solar.sunrise;
     if(request!==chartRequest) return;
     if(dayLength<=0||dayLength>=1440) throw new Error('Sunrise/sunset values are not valid for this location and date.');
-    const phase=selectedMoonPhase(date,solar.estimatedNextSunrise?undefined:solar.timezone);
-    const periods=makePeriods(dayIndex,solar.sunrise,dayLength), horas=makeHoras(dayIndex,solar.sunrise,solar.sunset,solar.nextSunrise,phase);
+    const timezone=solar.estimatedNextSunrise?$('manualTimezone').value.trim():solar.timezone;
+    const varjyam=makeVarjyam(date,timezone,solar.sunrise,solar.nextSunrise);
+    const phase=selectedMoonPhase(date,timezone);
+    const periods=[...makePeriods(dayIndex,solar.sunrise,dayLength,solar.nextSunrise),...varjyam].sort((a,b)=>a.start-b.start), horas=makeHoras(dayIndex,solar.sunrise,solar.sunset,solar.nextSunrise,phase);
     const manualOnly=solar.estimatedNextSunrise;
     renderSummary(solar.sunrise,solar.sunset,solar.timezone,dayIndex,solar.manual,manualOnly?'Entered times':selectedPlace.name); renderPeriods(periods); renderHoras(horas,periods); renderGhadiya(dayIndex,solar.sunrise,solar.sunset,solar.nextSunrise,horas,periods);
     $('horaCoverage').textContent='Daytime and nighttime horas';
     $('horaHelp').textContent=manualOnly?'Tomorrow’s sunrise is estimated using today’s sunrise.':'Tomorrow’s sunrise uses the selected location.';
+    $('varjyamHelp').textContent=varjyam.length?`Varjyam: ${varjyam.length} window(s) within this sunrise-to-next-sunrise chart. Lunar timings use ${timezone}.`:`No Varjyam window falls within this sunrise-to-next-sunrise chart. Lunar timings use ${timezone}.`;
     setStatus(manualOnly?`Showing ${DAYS[dayIndex]} using your sunrise and sunset. Tomorrow’s sunrise is estimated as ${fmt(solar.nextSunrise)}.`:`Showing ${DAYS[dayIndex]} in ${selectedPlace.name}${solar.manual?' using your adjusted times':''}. Times are local to the selected place.`);
     return true;
   } catch(error) { if(request===chartRequest) setStatus(error.message||'Unable to calculate this chart.',true); return false; }
@@ -353,6 +418,7 @@ dateInput.addEventListener('change',loadChart);
 $('sunriseInput').addEventListener('change',loadChart);
 $('sunsetInput').addEventListener('change',loadChart);
 $('moonPhase').addEventListener('change',loadChart);
+$('manualTimezone').addEventListener('change',loadChart);
 $('sunriseReset').addEventListener('click',()=>{$('sunriseInput').value='';$('sunsetInput').value='';loadChart();});
 window.addEventListener('beforeinstallprompt',event=>{event.preventDefault();installPrompt=event;$('installButton').hidden=false;});
 $('installButton').addEventListener('click',async()=>{if(!installPrompt)return;installPrompt.prompt();await installPrompt.userChoice;installPrompt=null;$('installButton').hidden=true;});
@@ -370,6 +436,7 @@ if('serviceWorker' in navigator) window.addEventListener('load',async()=>{
   }
 });
 const now=new Date(); dateInput.value=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+$('manualTimezone').value='Asia/Kolkata';
 function initializeLocation() {
   selectedMoonPhase(dateInput.value);
   try {

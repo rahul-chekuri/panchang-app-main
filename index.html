@@ -22,6 +22,7 @@
       <label class="field"><span>Date</span><input id="dateInput" type="date"></label>
       <div class="field location-field"><label for="placeInput">Location</label><div class="location-row"><input id="placeInput" type="search" placeholder="Search a city or place" autocomplete="off"><button id="searchButton" class="secondary-button">Search</button></div><div id="searchResults" class="search-results" hidden></div></div>
       <div class="field sunrise-field"><div class="solar-row"><label for="sunriseInput">Sunrise (optional)<input id="sunriseInput" type="time"></label><label for="sunsetInput">Sunset (optional)<input id="sunsetInput" type="time"></label><button id="sunriseReset" type="button" class="secondary-button">Auto</button></div><small>Enter both to calculate without a location. Tomorrow's sunrise is estimated as today's sunrise. Auto clears both times.</small><label for="moonPhase">Moon phase / చంద్ర పక్షం</label><select id="moonPhase"><option value="">Auto (selected date)</option><option value="waxing">Waxing / శుక్ల పక్షం</option><option value="waning">Waning / కృష్ణ పక్షం</option></select><small id="moonPhaseHelp">Moon phase is estimated at noon on the selected date. You can override it using your almanac.</small></div>
+      <label class="field manual-timezone-field" for="manualTimezone"><span>Timezone for manual sunrise/sunset</span><input id="manualTimezone" type="text" placeholder="Asia/Kolkata" aria-describedby="timezoneHelp"><small id="timezoneHelp">Defaults to Indian Standard Time (Asia/Kolkata) for South India. Location mode uses the selected place's timezone.</small></label>
       <button id="gpsButton" class="gps-button"><span aria-hidden="true">⌖</span> Use my location</button>
       <p id="status" class="status" role="status" aria-live="polite">Finding your location for today's chart. Allow location permission when asked.</p>
       <p class="location-help">Location needs HTTPS and both browser and phone permission. If opening from another app, use Chrome or Safari instead.</p>
@@ -30,6 +31,7 @@
     <section id="dailySummary" class="summary-grid" hidden aria-label="Sunrise and sunset"></section>
     <section id="periodSection" class="section" hidden>
       <div class="section-heading"><div><p class="eyebrow">Avoid starting important new work</p><h2>Periods to watch</h2></div><span class="section-count" id="periodCount"></span></div>
+      <p id="varjyamHelp" class="section-copy"></p>
       <div id="periodList" class="period-grid"></div>
     </section>
     <section id="horaSection" class="section" hidden>
@@ -41,12 +43,13 @@
       <p class="section-copy">The selected weekday's table repeats from its first row at sunset and, if needed, after 30 rows. The last interval is shortened at sunset or next sunrise. Times marked +1 day are after midnight. Each card splits at hora and avoid-period boundaries. Red means unfavorable; amber means mixed or uncertain; green requires a favorable result and hora with no avoid period.</p>
       <div id="ghadiyaList" class="ghadiya-list"></div>
     </section>
-    <aside class="note-card"><span class="note-icon">i</span><p><strong>Tradition and accuracy.</strong> Rahu Kalam, Yamagandam and Gulika are calculated by dividing daylight into eight parts. Durmuhurtham uses a weekday-based one-of-15 daylight segment. Panchangam conventions can differ by region; use this chart as a planning aid, not a substitute for your family's or priest's tradition. The ghadiya ratings are inferred from the supplied result text; review neutral/uncertain labels with care.</p></aside>
-    <footer><span>Shubhakruth Samvatsara ghadiya table supplied by you.</span><span>Solar and lunar estimates: SunCalc · Place search: OpenStreetMap</span></footer>
+    <aside class="note-card"><span class="note-icon">i</span><p><strong>Tradition and accuracy.</strong> Rahu Kalam, Yamagandam and Gulika divide daylight into eight parts. Durmuhurtham includes all weekday windows, including Tuesday night; Saturday has two consecutive windows. Varjyam uses estimated Lahiri sidereal nakshatra boundaries and four sixtieths of each nakshatra's actual duration, including both Mula windows. Small differences from your almanac are possible; verify important timings locally. Use this chart as a planning aid, not a substitute for your family's or priest's tradition. Ghadiya ratings are inferred from the supplied result text.</p></aside>
+    <footer><span>Shubhakruth Samvatsara ghadiya table supplied by you.</span><span>SunCalc + Astronomy Engine estimates · Place search: OpenStreetMap</span></footer>
   </main>
   <div id="loadingPanel" class="loading-panel" role="status" aria-live="polite" hidden><span class="loading-spinner" aria-hidden="true"></span><span id="loadingText"></span></div>
   <script src="./vendor/suncalc.js" defer></script>
   <script src="./vendor/tz-lookup.js" defer></script>
+  <script src="./vendor/astronomy-engine.js" defer></script>
   <script src="./app.js" defer></script>
 </body>
 </html>
