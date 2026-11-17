@@ -25,7 +25,7 @@ function app(overrides = {}) {
   };
   vm.createContext(context);
   vm.runInContext(readFileSync(join(__dirname, 'app.js'), 'utf8') +
-    '\nglobalThis.app = { GHADIYA_ROWS, GHADIYA_TELUGU_ROWS, PLANETS, renderGhadiya, splitGhadiya, segmentTime, applySunrise, resolveSunTimes, makeHoras, loadChart, useMyLocation, locationErrorMessage, initializeLocation, getSunTimes, dateAtPlace, moonPhaseForDate, startLoading, fetchWithTimeout, makePeriods, makeVarjyam, siderealMoonLongitude };', context);
+    '\nglobalThis.app = { GHADIYA_ROWS, GHADIYA_TELUGU_ROWS, PLANETS, renderGhadiya, splitGhadiya, segmentTime, applySunrise, resolveSunTimes, makeHoras, loadChart, useMyLocation, locationErrorMessage, initializeLocation, getSunTimes, dateAtPlace, moonPhaseForDate, startLoading, fetchWithTimeout, makePeriods, makeVarjyam, siderealMoonLongitude, goodWindows };', context);
   return { ...context.app, elements };
 }
 
@@ -430,4 +430,56 @@ test('manual Varjyam uses the explicit timezone and rejects invalid input withou
   assert.equal(instance.elements.get('periodSection').hidden,true);
   assert.throws(() => instance.makeVarjyam('1800-01-01','UTC',360,360),/1900 to 2100/);
   assert.throws(() => instance.makeVarjyam('2026-03-07','America/New_York',360,360),/clock change/);
+});
+
+test('good summary clips to 4 AM–10 PM, merges green portions, and preserves avoid gaps', () => {
+  const { goodWindows } = app();
+  const cycle = {
+    dayIndex: 0, shift: 0, solar: {sunrise:240,sunset:960,nextSunrise:240},
+    horas: [{start:200,end:1600,tone:'good',planet:{en:'Venus'}}],
+    periods: [{name:'Varjyam',start:250,end:260}]
+  };
+  const windows = goodWindows([cycle]);
+  // Sunday starts with two favorable source rows, then unfavorable rows.
+  assert.deepEqual(Array.from(windows.slice(0,3),w=>[w.start,w.end]),[[240,250],[260,288],[384,432]]);
+  assert.ok(windows.every(w=>w.start>=240 && w.end<=1320));
+  assert.ok(goodWindows([cycle],240,1270).some(w=>w.end===1270));
+  const bad = {...cycle,horas:[{...cycle.horas[0],tone:'bad'}]};
+  assert.equal(goodWindows([bad]).length,0);
+});
+
+test('before-sunrise summary uses the previous weekday night cycle without gaps at sunrise', () => {
+  const { goodWindows } = app();
+  const previous = {
+    dayIndex:0,shift:-1440,solar:{sunrise:360,sunset:1080,nextSunrise:360},
+    horas:[{start:0,end:1800,tone:'good',planet:{en:'Venus'}}],periods:[]
+  };
+  const current = {
+    dayIndex:1,shift:0,solar:{sunrise:360,sunset:1080,nextSunrise:360},
+    horas:[{start:0,end:1800,tone:'good',planet:{en:'Venus'}}],periods:[]
+  };
+  const previousOnly = goodWindows([previous]);
+  assert.ok(previousOnly.length>0);
+  assert.ok(previousOnly.every(w=>w.start>=240 && w.end<=360));
+  const combined = goodWindows([previous,current]);
+  assert.deepEqual(Array.from(combined.filter(w=>w.end<=360),w=>[w.start,w.end]),
+    Array.from(previousOnly,w=>[w.start,w.end]));
+  assert.ok(combined.some(w=>w.start>=360));
+});
+
+test('loading a manual chart adds a good-time summary and preserves the detailed charts', async () => {
+  const instance = app();
+  instance.elements.get('status').classList = { toggle() {} };
+  instance.elements.get('dateInput').value = '2026-11-17';
+  instance.elements.get('sunriseInput').value = '06:00';
+  instance.elements.get('sunsetInput').value = '18:00';
+  await instance.loadChart();
+  assert.equal(instance.elements.get('goodTimesSection').hidden,false);
+  assert.match(instance.elements.get('goodTimesNote').textContent,/Previous solar times are estimated/);
+  for (const id of ['periodSection','horaSection','ghadiyaSection']) {
+    assert.equal(instance.elements.get(id).hidden,false);
+  }
+  instance.elements.get('sunsetInput').value = '05:00';
+  await instance.loadChart();
+  assert.equal(instance.elements.get('goodTimesSection').hidden,true);
 });

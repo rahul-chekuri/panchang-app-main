@@ -8,6 +8,7 @@ An installable, mobile-friendly static web app focused on Telugu/South Indian Pa
 - Searches places with OpenStreetMap; if automatic location fails, a valid saved location is used with an explicit warning.
 - Calculates sunrise, sunset, and Moon phase locally, without an external solar-data service.
 - Shows a non-blocking loading popup during location lookup, place search, and chart calculation.
+- Centers loading on the viewport and lists favorable time windows from 4 AM to 10 PM above the unchanged detailed charts.
 - Shows Rahu Kalam, Yamagandam, Gulika Kalam, all weekday Durmuhurtham windows, and automatic Varjyam windows.
 - Computes one-hour planetary horas across daytime and nighttime, restarting at sunset and shortening boundary intervals.
 - Repeats the 30-row ghadiya table during each day and night cycle and highlights overlapping periods.
@@ -49,6 +50,12 @@ The zero-based offsets in ghatis, from Ashwini through Revati, are: `50, 24, 30,
 Every window intersecting sunrise to next sunrise is included, including carryover from the preceding nakshatra, multiple windows, and after-midnight periods. Windows are clipped to the chart range. Days with no window explicitly say so. Varjyam participates in the same red overlap labels and exact ghadiya splitting as the other avoid periods.
 
 Supported lunar dates are 1900–2100. Independent Swiss Ephemeris 2.10.03 (Moshier/Lahiri) checks across 40 date/timezone cases differed by at most 1.8 minutes at the endpoints; regression fixtures allow three minutes. This is a validated estimate, not an official almanac feed or a guarantee of matching every tradition. Verify important timings against your local Panchangam. Charts spanning a timezone/DST clock change are rejected explicitly because the current clock-minute timeline cannot represent repeated or skipped clock times safely. An invalid timezone or unsupported date produces an error rather than silently omitting Varjyam.
+
+### Good-time summary
+
+The summary lists only green portions under the existing ghadiya/hora/avoid-period rules, clipped to 4 AM–10 PM on the selected local calendar date. Adjacent green portions are merged without hiding intervening red or amber portions; boundary times include seconds when needed. It uses the same slot generation and splitting functions as the detailed chart, not a separate favorable-time formula.
+
+Before sunrise, it calculates the previous weekday's nighttime ghadiya/hora cycle and its Varjyam and Durmuhurtham. Location mode calculates the previous day's solar times locally. Manual or adjusted-solar mode reuses the entered/adjusted sunrise and sunset as estimates for the previous day and discloses this in the summary. Automatic Moon phase uses the previous date for that night; a manual phase override applies to both cycles. If the previous cycle cannot be calculated (for example at the supported date-range boundary), the summary explicitly reports missing pre-sunrise coverage while preserving the current detailed charts. All windows follow the app's conventions and are planning estimates, not guarantees of an outcome.
 
 ### Split ghadiya rows
 

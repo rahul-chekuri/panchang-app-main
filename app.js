@@ -273,12 +273,7 @@ function renderHoras(horas,periods) {
 }
 function renderGhadiya(dayIndex,sunrise,sunset,nextSunrise,horas,periods) {
   $('weekdayLabel').textContent=`${DAYS[dayIndex]} · same weekday table repeated at sunset`;
-  const slots=[];
-  for(const [cycleStart,cycleEnd,cycle] of [[sunrise,sunset,'Day'],[sunset,nextSunrise+1440,'Night']]){
-    for(let start=cycleStart,i=0;start<cycleEnd;start+=24,i++){
-      slots.push({start,end:Math.min(start+24,cycleEnd),row:i%GHADIYA_ROWS.length,cycle});
-    }
-  }
+  const slots=ghadiyaSlots(sunrise,sunset,nextSunrise);
   $('ghadiyaList').innerHTML=slots.map(({start,end,row:i,cycle})=>{
     const text=GHADIYA_ROWS[i][dayIndex],tone=classify(text);
     const segments=splitGhadiya(start,end,tone,horas,periods);
@@ -290,6 +285,39 @@ function renderGhadiya(dayIndex,sunrise,sunset,nextSunrise,horas,periods) {
     const timeLabel=`${cycle} · ${chartTime(start)}–${chartTime(end)}`;
     return `<article class="ghadiya-card"><div class="slot-time">${timeLabel}</div><div class="slot-content"><div class="slot-result" lang="te">${escapeHtml(GHADIYA_TELUGU_ROWS[i][dayIndex])}</div><div class="slot-english">${escapeHtml(text)}</div><div class="slot-segments">${rows}</div></div></article>`;
   }).join(''); $('ghadiyaSection').hidden=false;
+}
+function ghadiyaSlots(sunrise,sunset,nextSunrise) {
+  const slots=[];
+  for(const [cycleStart,cycleEnd,cycle] of [[sunrise,sunset,'Day'],[sunset,nextSunrise+1440,'Night']]){
+    for(let start=cycleStart,i=0;start<cycleEnd;start+=24,i++){
+      slots.push({start,end:Math.min(start+24,cycleEnd),row:i%GHADIYA_ROWS.length,cycle});
+    }
+  }
+  return slots;
+}
+function goodWindows(cycles,from=240,to=1320) {
+  const green=[];
+  for(const {dayIndex,solar,horas,periods,shift} of cycles){
+    for(const slot of ghadiyaSlots(solar.sunrise,solar.sunset,solar.nextSunrise)){
+      const tone=classify(GHADIYA_ROWS[slot.row][dayIndex]);
+      for(const segment of splitGhadiya(slot.start,slot.end,tone,horas,periods)){
+        const start=Math.max(from,segment.start+shift),end=Math.min(to,segment.end+shift);
+        if(segment.tone==='good'&&end>start) green.push({start,end});
+      }
+    }
+  }
+  const merged=[];
+  for(const window of green.sort((a,b)=>a.start-b.start)){
+    const last=merged[merged.length-1];
+    if(last&&window.start<=last.end) last.end=Math.max(last.end,window.end);
+    else merged.push({...window});
+  }
+  return merged;
+}
+function renderGoodWindows(windows,note) {
+  $('goodTimesList').innerHTML=windows.length?windows.map(w=>`<div class="good-window">${segmentTime(w.start)}–${segmentTime(w.end)}</div>`).join(''):'<p class="section-copy">No green time windows meet all chart rules between 4 AM and 10 PM.</p>';
+  $('goodTimesNote').textContent=note;
+  $('goodTimesSection').hidden=false;
 }
 function splitGhadiya(start,end,ghadiyaTone,horas,periods) {
   const boundaries=[start,end];
@@ -325,8 +353,10 @@ async function loadChart() {
   if(!dateInput.value){setStatus('Choose a date to calculate the chart.',true);return;}
   setStatus('Calculating your chart…');
   const finishLoading=startLoading('Calculating sunrise, sunset, and your chart…');
-  for(const id of ['dailySummary','periodSection','horaSection','ghadiyaSection']) $(id).hidden=true;
+  for(const id of ['goodTimesSection','dailySummary','periodSection','horaSection','ghadiyaSection']) $(id).hidden=true;
   try {
+    if(window.requestAnimationFrame) await new Promise(resolve=>window.requestAnimationFrame(()=>setTimeout(resolve,0)));
+    if(request!==chartRequest) return;
     const date=dateInput.value;
     selectedMoonPhase(date);
     const solar=await resolveSunTimes(date,selectedPlace,$('sunriseInput').value,$('sunsetInput').value), dayIndex=weekday(date), dayLength=solar.sunset-solar.sunrise;
@@ -337,6 +367,24 @@ async function loadChart() {
     const phase=selectedMoonPhase(date,timezone);
     const periods=[...makePeriods(dayIndex,solar.sunrise,dayLength,solar.nextSunrise),...varjyam].sort((a,b)=>a.start-b.start), horas=makeHoras(dayIndex,solar.sunrise,solar.sunset,solar.nextSunrise,phase);
     const manualOnly=solar.estimatedNextSunrise;
+    const cycles=[{dayIndex,solar,horas,periods,shift:0}];
+    let summaryNote='Only green portions are listed: favorable ghadiya and hora, with no avoid period. Adjacent portions are combined.';
+    try {
+      const previousDate=datePlus(date,-1),previousDay=weekday(previousDate);
+      const previousSolar=solar.manual?{...solar,nextSunrise:solar.sunrise}:await getSunTimes(previousDate,selectedPlace.lat,selectedPlace.lon);
+      previousSolar.nextSunrise=solar.sunrise;
+      const previousPhase=$('moonPhase').value||moonPhaseForDate(previousDate,timezone);
+      const previousPeriods=[...makePeriods(previousDay,previousSolar.sunrise,previousSolar.sunset-previousSolar.sunrise,solar.sunrise),...makeVarjyam(previousDate,timezone,previousSolar.sunrise,solar.sunrise)];
+      const previousHoras=makeHoras(previousDay,previousSolar.sunrise,previousSolar.sunset,solar.sunrise,previousPhase);
+      cycles.unshift({dayIndex:previousDay,solar:previousSolar,horas:previousHoras,periods:previousPeriods,shift:-1440});
+      summaryNote+=' Before sunrise uses the previous weekday’s night cycle.';
+      if(solar.manual) summaryNote+=' Previous solar times are estimated using your entered/adjusted times.';
+    } catch(error) {
+      console.warn('Could not calculate the early-morning good-time summary.',error);
+      summaryNote+=` Before-sunrise summary unavailable: ${error.message}`;
+    }
+    if(request!==chartRequest) return;
+    renderGoodWindows(goodWindows(cycles),summaryNote);
     renderSummary(solar.sunrise,solar.sunset,solar.timezone,dayIndex,solar.manual,manualOnly?'Entered times':selectedPlace.name); renderPeriods(periods); renderHoras(horas,periods); renderGhadiya(dayIndex,solar.sunrise,solar.sunset,solar.nextSunrise,horas,periods);
     $('horaCoverage').textContent='Daytime and nighttime horas';
     $('horaHelp').textContent=manualOnly?'Tomorrow’s sunrise is estimated using today’s sunrise.':'Tomorrow’s sunrise uses the selected location.';
